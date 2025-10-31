@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react"
 import ChatInterface from "@/components/chat-interface"
 import TokenCounter from "@/components/token-counter"
 import { Menu, MessageSquare, Trash2, BookOpen, Plus, Sparkles, MoreHorizontal } from "lucide-react"
+import LumiChatsLanding from "@/components/landing-page"
 
 interface ChatSession {
   id: string
@@ -23,6 +24,8 @@ interface StudySession {
 }
 
 export default function Home() {
+  // Check if user has visited before
+  const [showLanding, setShowLanding] = useState(true)
   const [selectedModel, setSelectedModel] = useState("meta-llama/llama-3.3-8b-instruct:free")
   const [tokenCount, setTokenCount] = useState(0)
   const [messages, setMessages] = useState<Array<{ role: string; content: string }>>([])
@@ -37,9 +40,27 @@ export default function Home() {
 
   const sidebarRef = useRef<HTMLDivElement | null>(null)
 
+  // Check if user has visited before
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const hasVisited = window.localStorage.getItem("lumichats_has_visited")
+      if (hasVisited === "true") {
+        setShowLanding(false)
+      }
+    }
+  }, [])
+
+  // Handle entering the app
+  const handleEnterApp = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("lumichats_has_visited", "true")
+    }
+    setShowLanding(false)
+  }
+
   // Load chat sessions safely
   useEffect(() => {
-    if (typeof window === "undefined") return
+    if (typeof window === "undefined" || showLanding) return
     try {
       const saved = window.localStorage.getItem("mmchat_sessions")
       if (saved) {
@@ -57,11 +78,11 @@ export default function Home() {
     } finally {
       setSessionsLoaded(true)
     }
-  }, [])
+  }, [showLanding])
 
   // Load study sessions safely
   useEffect(() => {
-    if (typeof window === "undefined") return
+    if (typeof window === "undefined" || showLanding) return
     try {
       const saved = window.localStorage.getItem("mmchat_study_sessions")
       if (saved) {
@@ -77,14 +98,14 @@ export default function Home() {
       console.error("Failed to load study sessions:", err)
       window.localStorage.removeItem("mmchat_study_sessions")
     }
-  }, [])
+  }, [showLanding])
 
   // Save sessions whenever updated
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window !== "undefined" && !showLanding) {
       window.localStorage.setItem("mmchat_sessions", JSON.stringify(chatSessions))
     }
-  }, [chatSessions])
+  }, [chatSessions, showLanding])
 
   // Auto-update name & metadata
   useEffect(() => {
@@ -207,6 +228,11 @@ export default function Home() {
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
+
+  // Show landing page first
+  if (showLanding) {
+    return <LumiChatsLanding onEnterApp={handleEnterApp} />
+  }
 
   // Wait until sessions loaded before rendering UI
   if (!sessionsLoaded) {
