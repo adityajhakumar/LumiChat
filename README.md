@@ -1,180 +1,30 @@
+# Personal multi-model chat
 
+*Automatically synced with your [v0.app](https://v0.app) deployments*
 
-## 🌟 LumiChat — AI Orchestration Platform
+[![Deployed on Vercel](https://img.shields.io/badge/Deployed%20on-Vercel-black?style=for-the-badge&logo=vercel)](https://vercel.com/adityakumarjha292004-gmailcoms-projects/v0-personal-multi-model-chat)
+[![Built with v0](https://img.shields.io/badge/Built%20with-v0.app-black?style=for-the-badge)](https://v0.app/chat/jlkhLMrX58E)
 
-**LumiChat** is an AI orchestration layer that connects multiple AI models, agents, and tools into one intelligent workspace — enabling autonomous workflows, multi-model collaboration, and real-world task execution.
+## Overview
 
-> *Not just answers — AI that works together and acts.*
+This repository will stay in sync with your deployed chats on [v0.app](https://v0.app).
+Any changes you make to your deployed app will be automatically pushed to this repository from [v0.app](https://v0.app).
 
----
+## Deployment
 
-## 🚀 Key Capabilities
+Your project is live at:
 
-### 🤖 Multi-Model AI Hub
+**[https://vercel.com/adityakumarjha292004-gmailcoms-projects/v0-personal-multi-model-chat](https://vercel.com/adityakumarjha292004-gmailcoms-projects/v0-personal-multi-model-chat)**
 
-Choose, compare, and combine top AI models in one place:
+## Build your app
 
-* OpenAI GPT (ChatGPT)
-* Claude / Anthropic
-* Gemini / Google AI
-* Meta Llama
-* Mistral
-* CloudSonic
-* MiniMax
-* * many more
+Continue building your app on:
 
-### 🧠 AI Agent Workspace
+**[https://v0.app/chat/jlkhLMrX58E](https://v0.app/chat/jlkhLMrX58E)**
 
-Create persistent AI agents with identity, role, memory, and objectives:
+## How It Works
 
-* Personal Assistant
-* Coding Agent
-* Research Agent
-* Study / Note-taking bot
-* Business automation agent
-* Custom role-based bots
-
-Agents can collaborate, delegate tasks, and cross-reason.
-
-### 🔗 AI Orchestration Engine
-
-Chain multiple AIs & tools together to complete complex tasks:
-
-* Model-to-model collaboration
-* Tool calling (search, code, browser, DB, APIs)
-* Workflow automation
-* Human-in-the-loop control
-
-### 🌍 Live Knowledge & Search
-
-Integrated real-time search + knowledge memory:
-
-* Live web data
-* Document ingestion
-* Persistent memory
-* Vector/semantic search backend
-
-### 🧩 Extensible Tool System
-
-Connect tools to enhance AI:
-
-* Code runner
-* Browser research
-* File / PDF processing
-* Knowledge query
-* Custom APIs
-
----
-
-## 🎯 What You Can Do With LumiChat
-
-| Task                        | Result                           |
-| --------------------------- | -------------------------------- |
-| Research a topic            | Multi-model research + citations |
-| Write & debug code          | Agent coder + test runner        |
-| Plan + execute routines     | Autonomous workflows             |
-| Take notes from docs/videos | Structured notes + flashcards    |
-| Build AI assistants         | Custom agent creation            |
-| Compare model outputs       | Head-to-head reasoning           |
-| Automate business tasks     | Multi-agent workflows            |
-
----
-
-## 🛠 Features Breakdown
-
-| Category  | Features                               |
-| --------- | -------------------------------------- |
-| AI Models | 20+ LLMs, model switching              |
-| AI Agents | Personality, memory, multi-agent mode  |
-| Execution | Tool calling, code, browser, files     |
-| Data      | Knowledge memory, RAG, embeddings      |
-| Workflows | Multi-step, scheduled tasks, pipelines |
-| User      | Secure workspace, project folders      |
-
----
-
-## 📌 Why LumiChat?
-
-| LumiChat vs Others                                             |
-| -------------------------------------------------------------- |
-| GPT = Single model chatbot                                     |
-| Perplexity = AI search                                         |
-| Claude = Smart writing engine                                  |
-| **LumiChat = AI + Agents + Multi-Models + Workflow Execution** |
-
-> **One platform to think, collaborate, and act.**
-
----
-
-## 💡 Vision
-
-Bring autonomous AI workflows to everyone — from students to developers to businesses — without needing complex engineering frameworks.
-
-> **AI teamwork for real-world productivity.**
-
----
-
-## 🧭 Roadmap
-
-✅ Multi-model chat hub
-✅ Create custom AI agents
-✅ Persistent memory system
-✅ Model orchestration pipeline
-
-Coming soon:
-
-🔜 Voice + Real-time Agents
-🔜 Marketplace for tools & agents
-🔜 API + Plugin ecosystem
-🔜 Mobile + Desktop apps
-🔜 Team Workspaces & collaboration
-
----
-
-## 🏷 Pricing Model (Planned)
-
-| Tier          | Features                       |
-| ------------- | ------------------------------ |
-| Free          | Starter models, limited agents |
-| Pro           | Unlock all models + tools      |
-| Pay-As-You-Go | Token credits for heavy users  |
-| Enterprise    | Custom infra & security        |
-
----
-
-## 📂 Tech Stack (Example)
-
-| Layer        | Tech                         |
-| ------------ | ---------------------------- |
-| Frontend     | Next.js / React              |
-| Backend      | Node / FastAPI               |
-| Memory       | Upstash / VectorDB           |
-| Orchestrator | Custom routing engine        |
-| Auth         | JWT / OAuth                  |
-| DevOps       | Vercel / Docker / Cloudflare |
-
-> *Flexible architecture for model-agnostic AI orchestration.*
-
----
-
-## 🤝 Community & Contribution
-
-Contributions welcome!
-
-* Create tools & agent plugins
-* Share workflows + prompt packs
-* Suggest features
-* Build education & use-case libraries
-
----
-
-## ⭐ Support the Project
-
-If you like LumiChat, help us grow:
-
-* Star ⭐ the repo
-* Share feedback
-* Join the community
-* Spread the word
-
----
+1. Create and modify your project using [v0.app](https://v0.app)
+2. Deploy your chats from the v0 interface
+3. Changes are automatically pushed to this repository
+4. Vercel deploys the latest version from this repository
