@@ -47,7 +47,7 @@ export default function LumiChatsLanding({ onEnterApp }: LumiChatsLandingProps) 
             <div className="flex items-center space-x-3">
               {/* Logo */}
               <img 
-                src="https://i.postimg.cc/W4yXK9hS/image.png" 
+                src="/generated-image (1).png" 
                 alt="LumiChats Logo" 
                 className="w-8 h-8 object-contain"
               />
@@ -172,7 +172,7 @@ export default function LumiChatsLanding({ onEnterApp }: LumiChatsLandingProps) 
                   
                   <div className="flex items-start space-x-4 animate-slide-in-right animation-delay-300">
                     <img 
-                      src="https://i.postimg.cc/W4yXK9hS/image.png" 
+                      src="/generated-image (1).png"
                       alt="LumiChats" 
                       className="w-10 h-10 rounded-full object-cover flex-shrink-0"
                     />
@@ -617,7 +617,7 @@ export default function LumiChatsLanding({ onEnterApp }: LumiChatsLandingProps) 
           <div className="flex flex-col md:flex-row items-center justify-between">
             <div className="flex items-center space-x-2 mb-4 md:mb-0">
               <img 
-                src="https://i.postimg.cc/W4yXK9hS/image.png" 
+                src="/generated-image (1).png"
                 alt="LumiChats Logo" 
                 className="w-6 h-6 object-contain"
               />
