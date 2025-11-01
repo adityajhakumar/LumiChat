@@ -83,7 +83,7 @@ function parseStudyModeResponse(content: string): any[] {
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, model, image, studyMode, skillLevel = "beginner" } = await request.json()
+    const { messages, model, image, studyMode, skillLevel = "beginner", stream } = await request.json()
 
     if (!messages || !model) {
       return NextResponse.json({ error: "Missing messages or model" }, { status: 400 })
@@ -169,7 +169,107 @@ If anyone asks who made you or who developed you, always respond:
 Keep responses clear, polite, and engaging.`
     }
 
-    // Try each API key until one works
+    // STREAMING MODE
+    if (stream && !studyMode) {
+      let lastError: any = null
+      
+      for (const apiKey of API_KEYS) {
+        if (!apiKey) continue
+
+        try {
+          const response = await fetch(OPENROUTER_API_URL, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+              "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+              "X-Title": "LumiChats By TheVersync",
+            },
+            body: JSON.stringify({
+              model,
+              messages: [{ role: "system", content: systemPrompt }, ...formattedMessages],
+              temperature: 0.7,
+              max_tokens: 15000,
+              stream: true,
+            }),
+          })
+
+          if (!response.ok) {
+            lastError = await response.json()
+            continue
+          }
+
+          // Create streaming response
+          const encoder = new TextEncoder()
+          const reader = response.body?.getReader()
+
+          if (!reader) {
+            throw new Error("No response body")
+          }
+
+          const responseStream = new ReadableStream({
+            async start(controller) {
+              const decoder = new TextDecoder()
+              
+              try {
+                while (true) {
+                  const { done, value } = await reader.read()
+                  if (done) break
+
+                  const chunk = decoder.decode(value, { stream: true })
+                  const lines = chunk.split('\n').filter(line => line.trim() !== '')
+
+                  for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                      const data = line.slice(6)
+                      
+                      if (data === '[DONE]') {
+                        controller.enqueue(encoder.encode(`data: [DONE]\n\n`))
+                        continue
+                      }
+
+                      try {
+                        const parsed = JSON.parse(data)
+                        const content = parsed.choices?.[0]?.delta?.content || ''
+                        
+                        if (content) {
+                          const streamData = JSON.stringify({ content })
+                          controller.enqueue(encoder.encode(`data: ${streamData}\n\n`))
+                        }
+                      } catch (e) {
+                        // Skip invalid JSON
+                      }
+                    }
+                  }
+                }
+                
+                controller.enqueue(encoder.encode(`data: [DONE]\n\n`))
+                controller.close()
+              } catch (error) {
+                console.error("Streaming error:", error)
+                controller.error(error)
+              }
+            },
+          })
+
+          return new Response(responseStream, {
+            headers: {
+              "Content-Type": "text/event-stream",
+              "Cache-Control": "no-cache",
+              Connection: "keep-alive",
+            },
+          })
+
+        } catch (error) {
+          lastError = error
+          continue
+        }
+      }
+
+      return NextResponse.json({ error: lastError?.message || "All API keys failed" }, { status: 500 })
+    }
+
+    // NON-STREAMING MODE (for study mode or fallback)
     let lastError: any = null
     for (const apiKey of API_KEYS) {
       if (!apiKey) continue
