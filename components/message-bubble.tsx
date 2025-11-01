@@ -447,9 +447,9 @@ export default function MessageBubble({
   }
 
   // Find position of selected text in content
-  const findTextPosition = (selectedText: string): number => {
+  const findTextPosition = (selectedText: string): number =>  {
     const index = message.content.indexOf(selectedText)
-    return index >= 0 ? index : message.content.length
+    return index >= 0 ? index + selectedText.length : message.content.length
   }
 
   // Handle text selection for threading
