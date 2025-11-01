@@ -460,13 +460,72 @@ export default function MessageBubble({
     onFeedback?.(type)
   }
 
-  // Find exact position of selected text in the original content
-  const findTextPosition = (text: string): { start: number; end: number } => {
-    const index = message.content.indexOf(text)
-    if (index === -1) {
+  // Find exact position of selected text in the original content using DOM position
+  const findTextPosition = (selectedText: string, range: Range): { start: number; end: number } => {
+    if (!messageRef.current) {
+      return { start: 0, end: 0 }
+    }
+
+    try {
+      // Get all text nodes in the message
+      const walker = document.createTreeWalker(
+        messageRef.current,
+        NodeFilter.SHOW_TEXT,
+        null
+      )
+
+      let currentPos = 0
+      let node: Node | null
+      let foundStart = -1
+      let foundEnd = -1
+
+      // Walk through all text nodes and find position
+      while ((node = walker.nextNode())) {
+        const textContent = node.textContent || ''
+        
+        // Check if this node contains the start of our selection
+        if (range.startContainer === node || range.startContainer.contains(node) || node.contains(range.startContainer)) {
+          if (foundStart === -1) {
+            // Calculate offset based on range
+            if (range.startContainer === node) {
+              foundStart = currentPos + range.startOffset
+            } else if (node.contains(range.startContainer)) {
+              foundStart = currentPos
+            }
+          }
+        }
+
+        // Check if this node contains the end of our selection
+        if (range.endContainer === node || range.endContainer.contains(node) || node.contains(range.endContainer)) {
+          if (range.endContainer === node) {
+            foundEnd = currentPos + range.endOffset
+          } else if (node.contains(range.endContainer)) {
+            foundEnd = currentPos + textContent.length
+          }
+        }
+
+        currentPos += textContent.length
+      }
+
+      // Fallback: use indexOf if DOM position detection failed
+      if (foundStart === -1 || foundEnd === -1) {
+        const index = message.content.indexOf(selectedText)
+        if (index !== -1) {
+          return { start: index, end: index + selectedText.length }
+        }
+        return { start: message.content.length, end: message.content.length }
+      }
+
+      return { start: foundStart, end: foundEnd }
+    } catch (error) {
+      console.error('Error finding text position:', error)
+      // Fallback to simple search
+      const index = message.content.indexOf(selectedText)
+      if (index !== -1) {
+        return { start: index, end: index + selectedText.length }
+      }
       return { start: message.content.length, end: message.content.length }
     }
-    return { start: index, end: index + text.length }
   }
 
   // Handle text selection for threading
@@ -481,7 +540,7 @@ export default function MessageBubble({
         if (text && text.length > 10) {
           const range = selection?.getRangeAt(0)
           if (range && messageRef.current?.contains(range.commonAncestorContainer)) {
-            const positions = findTextPosition(text)
+            const positions = findTextPosition(text, range)
             setSelectedText(text)
             setSelectionRange(positions)
             
