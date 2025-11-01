@@ -4,6 +4,7 @@ import type React from "react"
 import { useState, useEffect, useRef } from "react"
 import ChatInterface from "@/components/chat-interface"
 import TokenCounter from "@/components/token-counter"
+import ShareChat from "@/components/share-chat"
 import { Menu, MessageSquare, Trash2, BookOpen, Plus, Sparkles, MoreHorizontal } from "lucide-react"
 import LumiChatsLanding from "@/components/landing-page"
 
@@ -383,6 +384,15 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
+            {/* Share Button - Only show when there's a current chat with messages */}
+            {currentChatId && !studyMode && messages.length > 0 && (
+              <ShareChat
+                chatId={currentChatId}
+                chatName={chatSessions.find((s) => s.id === currentChatId)?.name || "Chat"}
+                messages={messages}
+              />
+            )}
+            
             <button
               onClick={() => {
                 setStudyMode(!studyMode)
