@@ -64,16 +64,18 @@ export default function ChatInterface({
     }
   }, [currentStudySession])
 
-  // Smart scroll behavior
+  // Smart scroll behavior - improved
   const scrollToBottom = (force = false) => {
     if (!messagesContainerRef.current || !messagesEndRef.current) return
     
     const container = messagesContainerRef.current
-    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200
     
     // Only auto-scroll if user is near bottom OR force is true (new message sent)
     if (force || isNearBottom || !userScrolled) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
+      })
       setUserScrolled(false)
     }
   }
@@ -83,19 +85,26 @@ export default function ChatInterface({
     const container = messagesContainerRef.current
     if (!container) return
 
+    let scrollTimeout: NodeJS.Timeout
+
     const handleScroll = () => {
-      const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150
-      setUserScrolled(!isAtBottom)
+      clearTimeout(scrollTimeout)
+      scrollTimeout = setTimeout(() => {
+        const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200
+        setUserScrolled(!isAtBottom)
+      }, 150)
     }
 
-    container.addEventListener("scroll", handleScroll)
-    return () => container.removeEventListener("scroll", handleScroll)
+    container.addEventListener("scroll", handleScroll, { passive: true })
+    return () => {
+      container.removeEventListener("scroll", handleScroll)
+      clearTimeout(scrollTimeout)
+    }
   }, [])
 
   // Auto-scroll only when new messages arrive
   useEffect(() => {
     if (messages.length > 0) {
-      // Use setTimeout to ensure DOM has updated
       setTimeout(() => scrollToBottom(), 100)
     }
   }, [messages.length])
@@ -542,7 +551,8 @@ Format as JSON with this structure:
       {/* Messages */}
       <div 
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto"
+        className="flex-1 overflow-y-auto scroll-smooth"
+        style={{ scrollBehavior: 'smooth' }}
       >
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-2">
         {messages.length === 0 ? (

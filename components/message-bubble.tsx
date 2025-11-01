@@ -13,7 +13,7 @@ interface Thread {
   parentText: string
   messages: Array<{ role: string; content: string }>
   collapsed: boolean
-  insertPosition: number // Position in content where thread should appear
+  insertPosition: number
 }
 
 interface MessageBubbleProps {
@@ -431,7 +431,7 @@ export default function MessageBubble({
   const [selectedText, setSelectedText] = useState("")
   const [showThreadButton, setShowThreadButton] = useState(false)
   const [buttonPosition, setButtonPosition] = useState({ x: 0, y: 0 })
-  const [selectionPosition, setSelectionPosition] = useState(0)
+  const [selectionRange, setSelectionRange] = useState({ start: 0, end: 0 })
   const messageRef = useRef<HTMLDivElement>(null)
 
   const handleCopy = () => {
@@ -446,10 +446,13 @@ export default function MessageBubble({
     onFeedback?.(type)
   }
 
-  // Find position of selected text in content
-  const findTextPosition = (selectedText: string): number =>  {
-    const index = message.content.indexOf(selectedText)
-    return index >= 0 ? index + selectedText.length : message.content.length
+  // Find exact position of selected text in the original content
+  const findTextPosition = (text: string): { start: number; end: number } => {
+    const index = message.content.indexOf(text)
+    if (index === -1) {
+      return { start: message.content.length, end: message.content.length }
+    }
+    return { start: index, end: index + text.length }
   }
 
   // Handle text selection for threading
@@ -464,8 +467,9 @@ export default function MessageBubble({
         if (text && text.length > 10) {
           const range = selection?.getRangeAt(0)
           if (range && messageRef.current?.contains(range.commonAncestorContainer)) {
+            const positions = findTextPosition(text)
             setSelectedText(text)
-            setSelectionPosition(findTextPosition(text))
+            setSelectionRange(positions)
             
             const rect = range.getBoundingClientRect()
             setButtonPosition({
@@ -506,7 +510,7 @@ export default function MessageBubble({
       parentText: selectedText,
       messages: [],
       collapsed: false,
-      insertPosition: selectionPosition + selectedText.length
+      insertPosition: selectionRange.end
     }
 
     setThreads([...threads, newThread])
