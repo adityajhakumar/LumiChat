@@ -4,7 +4,7 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
-import { Copy, RotateCw, ThumbsUp, ThumbsDown, Check, Edit2, MessageSquare, ChevronDown, ChevronRight, X } from "lucide-react"
+import { Copy, RotateCw, ThumbsUp, ThumbsDown, Check, Edit2, MessageSquare, ChevronRight, X } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -166,14 +166,16 @@ function ThreadSection({
   }
 
   return (
-    <div className="my-4 border-l-2 border-[#CC785C] pl-4 bg-[#1A1A1A] rounded-r-lg py-3">
+    <div className="my-4 border-l-2 border-[#CC785C] pl-4 bg-[#1A1A1A] rounded-r-lg py-3 thread-section animate-in fade-in slide-in-from-left-2 duration-300">
       {/* Thread Header */}
       <div className="flex items-center justify-between mb-3">
         <button
           onClick={onToggle}
           className="flex items-center gap-2 text-xs text-[#A0A0A0] hover:text-[#ECECEC] transition-colors"
         >
-          {thread.collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+          <div className={`transition-transform duration-200 ${thread.collapsed ? '' : 'rotate-90'}`}>
+            <ChevronRight size={14} />
+          </div>
           <MessageSquare size={14} className="text-[#CC785C]" />
           <span className="font-medium">
             Thread ({thread.messages.length} {thread.messages.length === 1 ? 'reply' : 'replies'})
@@ -181,7 +183,7 @@ function ThreadSection({
         </button>
         <button
           onClick={onClose}
-          className="p-1 hover:bg-[#2A2A2A] rounded text-[#A0A0A0] hover:text-[#ECECEC] transition-colors"
+          className="p-1 hover:bg-[#2A2A2A] rounded text-[#A0A0A0] hover:text-[#ECECEC] transition-all hover:rotate-90 duration-200"
           title="Close thread"
         >
           <X size={14} />
@@ -189,7 +191,7 @@ function ThreadSection({
       </div>
 
       {/* Context Badge */}
-      <div className="mb-3 p-2 bg-[#252525] rounded-lg border border-[#3A3A3A]">
+      <div className="mb-3 p-2 bg-[#252525] rounded-lg border border-[#3A3A3A] transition-colors hover:border-[#CC785C]/50">
         <span className="text-xs text-[#A0A0A0] block mb-1">Discussing:</span>
         <p className="text-xs text-[#D4D4D4] italic line-clamp-2">
           "{thread.parentText}"
@@ -197,15 +199,21 @@ function ThreadSection({
       </div>
 
       {/* Thread Content */}
-      {!thread.collapsed && (
+      <div className={`overflow-hidden transition-all duration-300 ${
+        thread.collapsed ? 'max-h-0 opacity-0' : 'max-h-[2000px] opacity-100'
+      }`}>
         <div className="space-y-3">
           {/* Messages */}
           {thread.messages.map((msg, idx) => (
-            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${
+            <div 
+              key={idx} 
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2 duration-300`}
+              style={{ animationDelay: `${idx * 50}ms` }}
+            >
+              <div className={`max-w-[85%] px-3 py-2 rounded-lg text-sm transition-all hover:shadow-md ${
                 msg.role === 'user' 
-                  ? 'bg-[#2C2C2C] text-[#ECECEC]' 
-                  : 'bg-[#252525] text-[#D4D4D4] border border-[#3A3A3A]'
+                  ? 'bg-[#2C2C2C] text-[#ECECEC] hover:bg-[#333333]' 
+                  : 'bg-[#252525] text-[#D4D4D4] border border-[#3A3A3A] hover:border-[#4A4A4A]'
               }`}>
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
@@ -231,12 +239,12 @@ function ThreadSection({
           ))}
 
           {loading && (
-            <div className="flex justify-start">
+            <div className="flex justify-start animate-in fade-in duration-200">
               <div className="bg-[#252525] rounded-lg px-3 py-2">
                 <div className="flex space-x-1">
                   <div className="w-1.5 h-1.5 bg-[#6B6B6B] rounded-full animate-bounce"></div>
-                  <div className="w-1.5 h-1.5 bg-[#6B6B6B] rounded-full animate-bounce delay-100"></div>
-                  <div className="w-1.5 h-1.5 bg-[#6B6B6B] rounded-full animate-bounce delay-200"></div>
+                  <div className="w-1.5 h-1.5 bg-[#6B6B6B] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                  <div className="w-1.5 h-1.5 bg-[#6B6B6B] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                 </div>
               </div>
             </div>
@@ -250,20 +258,20 @@ function ThreadSection({
               onChange={(e) => setReplyText(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Reply to this thread... (Ctrl+Enter to send)"
-              className="min-h-[60px] bg-[#222222] border-[#3A3A3A] text-white placeholder-[#6B6B6B] text-sm resize-none"
+              className="min-h-[60px] bg-[#222222] border-[#3A3A3A] text-white placeholder-[#6B6B6B] text-sm resize-none focus:border-[#CC785C] focus:ring-1 focus:ring-[#CC785C] transition-all"
             />
             <div className="flex justify-end gap-2 mt-2">
               <button
                 onClick={handleSendReply}
                 disabled={loading || !replyText.trim()}
-                className="px-3 py-1.5 bg-[#CC785C] hover:bg-[#B8674A] disabled:bg-[#6B6B65] disabled:cursor-not-allowed text-white rounded-lg text-xs font-medium transition-colors"
+                className="px-3 py-1.5 bg-[#CC785C] hover:bg-[#B8674A] disabled:bg-[#6B6B65] disabled:cursor-not-allowed text-white rounded-lg text-xs font-medium transition-all hover:shadow-lg active:scale-95"
               >
                 {loading ? 'Sending...' : 'Send Reply'}
               </button>
             </div>
           </div>
         </div>
-      )}
+      </div>
     </div>
   )
 }
@@ -553,10 +561,23 @@ export default function MessageBubble({
             setSelectionRange(positions)
             
             const rect = range.getBoundingClientRect()
-            setButtonPosition({
-              x: rect.right + 10,
-              y: rect.top + window.scrollY
-            })
+            const messageRect = messageRef.current.getBoundingClientRect()
+            
+            // Smart positioning: prefer right side, but check screen bounds
+            let x = rect.right + 10
+            let y = rect.top + window.scrollY
+            
+            // If button would go off screen, position to the left
+            if (x + 150 > window.innerWidth) {
+              x = rect.left - 150
+            }
+            
+            // Ensure it's within the message bounds horizontally
+            if (x < messageRect.left) {
+              x = messageRect.left + 10
+            }
+            
+            setButtonPosition({ x, y })
             setShowThreadButton(true)
           } else {
             setShowThreadButton(false)
@@ -569,17 +590,23 @@ export default function MessageBubble({
 
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement
-      if (!target.closest('.thread-button')) {
+      if (!target.closest('.thread-button') && !target.closest('.thread-section')) {
         setShowThreadButton(false)
       }
     }
 
+    const handleScroll = () => {
+      setShowThreadButton(false)
+    }
+
     document.addEventListener('mouseup', handleMouseUp)
     document.addEventListener('click', handleClickOutside)
+    window.addEventListener('scroll', handleScroll, true)
     
     return () => {
       document.removeEventListener('mouseup', handleMouseUp)
       document.removeEventListener('click', handleClickOutside)
+      window.removeEventListener('scroll', handleScroll, true)
     }
   }, [isUser, message.content])
 
@@ -597,7 +624,12 @@ export default function MessageBubble({
     setThreads([...threads, newThread])
     setShowThreadButton(false)
     setSelectedText("")
-    window.getSelection()?.removeAllRanges()
+    
+    // Smooth deselection with fade effect
+    const selection = window.getSelection()
+    if (selection) {
+      setTimeout(() => selection.removeAllRanges(), 150)
+    }
   }
 
   const handleThreadReply = async (threadId: string, replyMessage: string) => {
@@ -645,7 +677,7 @@ export default function MessageBubble({
       {showThreadButton && (
         <button
           onClick={handleCreateThread}
-          className="thread-button fixed z-50 bg-[#CC785C] hover:bg-[#B8674A] text-white px-3 py-1.5 rounded-lg shadow-xl text-xs font-medium flex items-center gap-1.5 transition-all hover:scale-105"
+          className="thread-button fixed z-50 bg-[#CC785C] hover:bg-[#B8674A] text-white px-3 py-1.5 rounded-lg shadow-xl text-xs font-medium flex items-center gap-1.5 transition-all hover:scale-105 animate-in fade-in slide-in-from-top-2 duration-200"
           style={{
             left: `${buttonPosition.x}px`,
             top: `${buttonPosition.y}px`
