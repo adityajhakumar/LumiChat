@@ -301,8 +301,22 @@ function ContentWithThreads({
   let lastIndex = 0
 
   sortedThreads.forEach((thread, idx) => {
+    // Find the end of the paragraph/sentence containing the selected text
+    let insertPos = thread.insertPosition
+    
+    // Look for the next paragraph break or double newline after the selection
+    const nextParagraph = content.indexOf('\n\n', insertPos)
+    const nextNewline = content.indexOf('\n', insertPos)
+    
+    // Insert after the current paragraph/line ends
+    if (nextNewline !== -1 && nextNewline < insertPos + 100) {
+      insertPos = nextNewline + 1
+    } else if (nextParagraph !== -1 && nextParagraph < insertPos + 200) {
+      insertPos = nextParagraph + 2
+    }
+    
     // Add content before this thread
-    const beforeContent = content.substring(lastIndex, thread.insertPosition)
+    const beforeContent = content.substring(lastIndex, insertPos)
     if (beforeContent) {
       parts.push(
         <div key={`content-${idx}`}>
@@ -328,7 +342,7 @@ function ContentWithThreads({
       />
     )
 
-    lastIndex = thread.insertPosition
+    lastIndex = insertPos
   })
 
   // Add remaining content after last thread
