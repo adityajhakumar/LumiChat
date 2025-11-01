@@ -297,7 +297,7 @@ function ContentWithThreads({
     )
   }
 
-  const parts: JSX.Element[] = []
+  const parts: React.ReactElement[] = []
   let lastIndex = 0
 
   sortedThreads.forEach((thread, idx) => {
