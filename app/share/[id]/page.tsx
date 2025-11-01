@@ -1,13 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useParams, useRouter } from "next/navigation"
+import { useParams } from "next/navigation"
 import MessageBubble from "@/components/message-bubble"
 import { ArrowLeft, ExternalLink } from "lucide-react"
 
 export default function SharedChatPage() {
   const params = useParams()
-  const router = useRouter()
   const shareId = params.id as string
 
   const [loading, setLoading] = useState(true)
@@ -17,21 +16,23 @@ export default function SharedChatPage() {
   useEffect(() => {
     const loadSharedChat = async () => {
       try {
-        const result = await window.storage.get(shareId, true)
-        
-        if (!result) {
-          setError("This shared chat doesn't exist or has expired.")
-          setLoading(false)
-          return
+        // Try to load from localStorage as fallback
+        if (typeof window !== "undefined") {
+          const stored = localStorage.getItem(`shared_${shareId}`)
+          
+          if (!stored) {
+            setError("This shared chat doesn't exist or has expired.")
+            setLoading(false)
+            return
+          }
+
+          const data = JSON.parse(stored)
+          setChatData(data)
+
+          // Increment view count
+          data.views = (data.views || 0) + 1
+          localStorage.setItem(`shared_${shareId}`, JSON.stringify(data))
         }
-
-        const data = JSON.parse(result.value)
-        setChatData(data)
-
-        // Increment view count
-        data.views = (data.views || 0) + 1
-        await window.storage.set(shareId, JSON.stringify(data), true)
-        
       } catch (err) {
         console.error("Error loading shared chat:", err)
         setError("Failed to load shared chat.")

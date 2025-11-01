@@ -20,8 +20,8 @@ export default function ShareChat({ chatId, chatName, messages }: ShareChatProps
     setLoading(true);
     
     try {
-      // Store the chat in persistent storage
-      const shareId = `share_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // Generate unique share ID
+      const shareId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
       const shareData = {
         id: shareId,
@@ -33,7 +33,20 @@ export default function ShareChat({ chatId, chatName, messages }: ShareChatProps
         views: 0
       };
 
-      await window.storage.set(shareId, JSON.stringify(shareData), true);
+      // Store in localStorage with shared_ prefix
+      if (typeof window !== "undefined") {
+        localStorage.setItem(`shared_${shareId}`, JSON.stringify(shareData));
+        
+        // Also keep a registry of all shared chats
+        const registry = localStorage.getItem('shared_chats_registry');
+        const registryData = registry ? JSON.parse(registry) : [];
+        registryData.push({
+          id: shareId,
+          chatName,
+          createdAt: Date.now()
+        });
+        localStorage.setItem('shared_chats_registry', JSON.stringify(registryData));
+      }
       
       // Generate share link
       const link = `${window.location.origin}/share/${shareId}`;
@@ -143,7 +156,7 @@ export default function ShareChat({ chatId, chatName, messages }: ShareChatProps
                     </button>
                   </div>
                   <p className="text-xs text-[#6B6B65]">
-                    This link will expire after 30 days or when you delete the chat.
+                    Share links are stored locally in your browser. They will be available as long as your browser data is not cleared.
                   </p>
                 </div>
               ) : (
