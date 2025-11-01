@@ -14,7 +14,6 @@ interface Thread {
   messages: Array<{ role: string; content: string }>
   collapsed: boolean
   insertPosition: number
-  anchorPosition: { top: number; left: number }
 }
 
 interface MessageBubbleProps {
@@ -133,19 +132,16 @@ function ThreadSection({
   thread, 
   onToggle, 
   onReply, 
-  onClose,
-  anchorPosition
+  onClose
 }: { 
   thread: Thread
   onToggle: () => void
   onReply: (message: string) => Promise<void>
   onClose: () => void
-  anchorPosition: { top: number; left: number }
 }) {
   const [replyText, setReplyText] = useState("")
   const [loading, setLoading] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const threadBoxRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!thread.collapsed && textareaRef.current) {
@@ -169,180 +165,110 @@ function ThreadSection({
     }
   }
 
-  // Calculate positions for the connector line and thread box
-  const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200
-  
-  // Get the thread box position (fixed to right edge)
-  const threadBoxRightEdge = viewportWidth - 20 // 20px from right edge
-  const threadBoxWidth = thread.collapsed ? 280 : 380
-  const threadBoxLeft = threadBoxRightEdge - threadBoxWidth
-  
-  const lineStartX = anchorPosition.left
-  const lineStartY = anchorPosition.top
-  const lineEndX = threadBoxLeft - 10 // Point to left edge of thread box
-  const lineEndY = anchorPosition.top + 20
-
   return (
-    <>
-      {/* Connector Line - SVG for smooth curved line */}
-      <svg
-        className="fixed pointer-events-none z-40"
-        style={{
-          left: 0,
-          top: 0,
-          width: '100%',
-          height: '100%',
-        }}
-      >
-        <defs>
-          <linearGradient id={`gradient-${thread.id}`} x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#CC785C" stopOpacity="0.5" />
-            <stop offset="100%" stopColor="#CC785C" stopOpacity="0.9" />
-          </linearGradient>
-        </defs>
-        <path
-          d={`M ${lineStartX} ${lineStartY} C ${lineStartX + 100} ${lineStartY}, ${lineEndX - 100} ${lineEndY}, ${lineEndX} ${lineEndY}`}
-          stroke={`url(#gradient-${thread.id})`}
-          strokeWidth="2.5"
-          fill="none"
-          strokeDasharray={thread.collapsed ? "8,4" : "none"}
-          className="transition-all duration-300"
-        />
-        {/* Connection point at start */}
-        <circle
-          cx={lineStartX}
-          cy={lineStartY}
-          r="4"
-          fill="#CC785C"
-          opacity="0.8"
-        />
-        {/* Arrowhead at end */}
-        <polygon
-          points={`${lineEndX},${lineEndY} ${lineEndX - 8},${lineEndY - 5} ${lineEndX - 8},${lineEndY + 5}`}
-          fill="#CC785C"
-          opacity="0.9"
-        />
-      </svg>
+    <div className="my-4 border-l-2 border-[#CC785C] pl-4 bg-[#1A1A1A] rounded-r-lg py-3">
+      {/* Thread Header */}
+      <div className="flex items-center justify-between mb-3">
+        <button
+          onClick={onToggle}
+          className="flex items-center gap-2 text-xs text-[#A0A0A0] hover:text-[#ECECEC] transition-colors"
+        >
+          {thread.collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+          <MessageSquare size={14} className="text-[#CC785C]" />
+          <span className="font-medium">
+            Thread ({thread.messages.length} {thread.messages.length === 1 ? 'reply' : 'replies'})
+          </span>
+        </button>
+        <button
+          onClick={onClose}
+          className="p-1 hover:bg-[#2A2A2A] rounded text-[#A0A0A0] hover:text-[#ECECEC] transition-colors"
+          title="Close thread"
+        >
+          <X size={14} />
+        </button>
+      </div>
 
-      {/* Thread Box - Floating on the right */}
-      <div
-        ref={threadBoxRef}
-        className="fixed z-50 transition-all duration-300 ease-out"
-        style={{
-          right: '20px', // Fixed to right edge with padding
-          top: `${anchorPosition.top - 20}px`,
-          maxWidth: thread.collapsed ? '280px' : '380px',
-          width: thread.collapsed ? '280px' : '380px',
-        }}
-      >
-        <div className={`bg-[#1A1A1A] rounded-xl shadow-2xl border-2 border-[#CC785C]/60 overflow-hidden transition-all duration-300 backdrop-blur-sm ${
-          thread.collapsed ? 'max-h-[140px]' : 'max-h-[70vh]'
-        }`}>
-          <div className="flex items-center justify-between p-3 bg-gradient-to-r from-[#CC785C]/20 to-transparent border-b border-[#CC785C]/30">
-            <button
-              onClick={onToggle}
-              className="flex items-center gap-2 text-sm text-white hover:text-[#CC785C] transition-colors flex-1"
-            >
-              {thread.collapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-              <MessageSquare size={16} className="text-[#CC785C]" />
-              <span className="font-medium">
-                Thread ({thread.messages.length})
-              </span>
-            </button>
-            <button
-              onClick={onClose}
-              className="p-1.5 hover:bg-[#2A2A2A] rounded-lg text-[#A0A0A0] hover:text-[#CC785C] transition-all"
-              title="Close thread"
-            >
-              <X size={16} />
-            </button>
-          </div>
+      {/* Context Badge */}
+      <div className="mb-3 p-2 bg-[#252525] rounded-lg border border-[#3A3A3A]">
+        <span className="text-xs text-[#A0A0A0] block mb-1">Discussing:</span>
+        <p className="text-xs text-[#D4D4D4] italic line-clamp-2">
+          "{thread.parentText}"
+        </p>
+      </div>
 
-          <div className="p-3 bg-[#1E1E1E] border-b border-[#2A2A2A]">
-            <p className="text-xs text-[#A0A0A0] mb-1 font-medium">Discussing:</p>
-            <p className="text-xs text-[#D4D4D4] italic line-clamp-2 leading-relaxed">
-              "{thread.parentText}"
-            </p>
-          </div>
-
-          {!thread.collapsed && (
-            <div className="flex flex-col max-h-[440px]">
-              <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-[200px] max-h-[300px] bg-[#171717]">
-                {thread.messages.length === 0 ? (
-                  <div className="text-center text-[#6B6B6B] text-xs py-8">
-                    Start a conversation about this section
-                  </div>
-                ) : (
-                  thread.messages.map((msg, idx) => (
-                    <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                      <div className={`max-w-[85%] px-3 py-2 rounded-lg text-xs ${
-                        msg.role === 'user' 
-                          ? 'bg-[#CC785C]/20 text-[#ECECEC] border border-[#CC785C]/30' 
-                          : 'bg-[#252525] text-[#D4D4D4] border border-[#3A3A3A]'
-                      }`}>
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          components={{
-                            p: ({ node, ...props }: any) => <p className="text-xs leading-relaxed" {...props} />,
-                            code: ({ node, inline, children, ...props }: any) => {
-                              return inline ? (
-                                <code className="bg-[#2A2A2A] text-[#E69B8A] px-1 py-0.5 rounded text-[10px] font-mono" {...props}>
-                                  {children}
-                                </code>
-                              ) : (
-                                <code className="text-[10px]" {...props}>{children}</code>
-                              )
-                            }
-                          }}
+      {/* Thread Content */}
+      {!thread.collapsed && (
+        <div className="space-y-3">
+          {/* Messages */}
+          {thread.messages.map((msg, idx) => (
+            <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[85%] px-3 py-2 rounded-lg text-sm ${
+                msg.role === 'user' 
+                  ? 'bg-[#2C2C2C] text-[#ECECEC]' 
+                  : 'bg-[#252525] text-[#D4D4D4] border border-[#3A3A3A]'
+              }`}>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    code: ({ node, inline, children, ...props }: any) => {
+                      return inline ? (
+                        <code
+                          className="bg-[#2A2A2A] text-[#E69B8A] px-1 py-0.5 rounded text-xs font-mono"
+                          {...props}
                         >
-                          {msg.content}
-                        </ReactMarkdown>
-                      </div>
-                    </div>
-                  ))
-                )}
-
-                {loading && (
-                  <div className="flex justify-start">
-                    <div className="bg-[#252525] rounded-lg px-3 py-2">
-                      <div className="flex space-x-1">
-                        <div className="w-1 h-1 bg-[#CC785C] rounded-full animate-bounce"></div>
-                        <div className="w-1 h-1 bg-[#CC785C] rounded-full animate-bounce delay-100"></div>
-                        <div className="w-1 h-1 bg-[#CC785C] rounded-full animate-bounce delay-200"></div>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                          {children}
+                        </code>
+                      ) : (
+                        <code className="text-xs" {...props}>{children}</code>
+                      )
+                    }
+                  }}
+                >
+                  {msg.content}
+                </ReactMarkdown>
               </div>
+            </div>
+          ))}
 
-              <div className="p-3 bg-[#1E1E1E] border-t border-[#2A2A2A]">
-                <Textarea
-                  ref={textareaRef}
-                  value={replyText}
-                  onChange={(e) => setReplyText(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Reply... (Ctrl+Enter)"
-                  className="min-h-[50px] max-h-[100px] bg-[#222222] border-[#3A3A3A] text-white placeholder-[#6B6B6B] text-xs resize-none focus:border-[#CC785C] focus:ring-1 focus:ring-[#CC785C]"
-                  rows={2}
-                />
-                <div className="flex justify-end mt-2">
-                  <button
-                    onClick={handleSendReply}
-                    disabled={loading || !replyText.trim()}
-                    className="px-3 py-1.5 bg-[#CC785C] hover:bg-[#B8674A] disabled:bg-[#6B6B65] disabled:cursor-not-allowed text-white rounded-lg text-xs font-medium transition-all hover:scale-105"
-                  >
-                    {loading ? 'Sending...' : 'Send'}
-                  </button>
+          {loading && (
+            <div className="flex justify-start">
+              <div className="bg-[#252525] rounded-lg px-3 py-2">
+                <div className="flex space-x-1">
+                  <div className="w-1.5 h-1.5 bg-[#6B6B6B] rounded-full animate-bounce"></div>
+                  <div className="w-1.5 h-1.5 bg-[#6B6B6B] rounded-full animate-bounce delay-100"></div>
+                  <div className="w-1.5 h-1.5 bg-[#6B6B6B] rounded-full animate-bounce delay-200"></div>
                 </div>
               </div>
             </div>
           )}
+
+          {/* Reply Input */}
+          <div className="pt-2 border-t border-[#2A2A2A]">
+            <Textarea
+              ref={textareaRef}
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Reply to this thread... (Ctrl+Enter to send)"
+              className="min-h-[60px] bg-[#222222] border-[#3A3A3A] text-white placeholder-[#6B6B6B] text-sm resize-none"
+            />
+            <div className="flex justify-end gap-2 mt-2">
+              <button
+                onClick={handleSendReply}
+                disabled={loading || !replyText.trim()}
+                className="px-3 py-1.5 bg-[#CC785C] hover:bg-[#B8674A] disabled:bg-[#6B6B65] disabled:cursor-not-allowed text-white rounded-lg text-xs font-medium transition-colors"
+              >
+                {loading ? 'Sending...' : 'Send Reply'}
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
-    </>
+      )}
+    </div>
   )
 }
 
+// Component to split content and insert threads at specific positions
 function ContentWithThreads({ 
   content, 
   threads,
@@ -356,8 +282,11 @@ function ContentWithThreads({
   onReply: (id: string, msg: string) => Promise<void>
   onClose: (id: string) => void
 }) {
-  return (
-    <>
+  // Sort threads by position (earliest first)
+  const sortedThreads = [...threads].sort((a, b) => a.insertPosition - b.insertPosition)
+  
+  if (sortedThreads.length === 0) {
+    return (
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
@@ -365,19 +294,82 @@ function ContentWithThreads({
       >
         {content}
       </ReactMarkdown>
+    )
+  }
 
-      {threads.map((thread) => (
-        <ThreadSection
-          key={thread.id}
-          thread={thread}
-          onToggle={() => onToggle(thread.id)}
-          onReply={(msg) => onReply(thread.id, msg)}
-          onClose={() => onClose(thread.id)}
-          anchorPosition={thread.anchorPosition}
-        />
-      ))}
-    </>
-  )
+  const parts: React.ReactElement[] = []
+  let lastIndex = 0
+
+  sortedThreads.forEach((thread, idx) => {
+    let insertPos = thread.insertPosition
+    
+    // Check if we're inside a code block
+    const beforeText = content.substring(0, insertPos)
+    const afterText = content.substring(insertPos)
+    
+    // Count code block markers before and after the position
+    const codeBlocksBefore = (beforeText.match(/```/g) || []).length
+    const isInsideCodeBlock = codeBlocksBefore % 2 !== 0
+    
+    if (isInsideCodeBlock) {
+      // Find the end of the current code block
+      const codeBlockEnd = afterText.indexOf('```')
+      if (codeBlockEnd !== -1) {
+        insertPos = insertPos + codeBlockEnd + 3 // Move past the closing ```
+        // Skip any whitespace after code block
+        while (insertPos < content.length && /\s/.test(content[insertPos])) {
+          insertPos++
+        }
+      }
+    }
+    
+    // Add content up to and including the selected text
+    const beforeContent = content.substring(lastIndex, insertPos)
+    if (beforeContent) {
+      parts.push(
+        <div key={`content-${idx}`}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm, remarkMath]}
+            rehypePlugins={[rehypeKatex]}
+            components={getMarkdownComponents()}
+          >
+            {beforeContent}
+          </ReactMarkdown>
+        </div>
+      )
+    }
+
+    // Add the thread immediately after the selected text
+    parts.push(
+      <ThreadSection
+        key={thread.id}
+        thread={thread}
+        onToggle={() => onToggle(thread.id)}
+        onReply={(msg) => onReply(thread.id, msg)}
+        onClose={() => onClose(thread.id)}
+      />
+    )
+
+    lastIndex = insertPos
+  })
+
+  // Add remaining content after last thread
+  const remainingContent = content.substring(lastIndex)
+  if (remainingContent) {
+    parts.push(
+      <div key="content-end">
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm, remarkMath]}
+          rehypePlugins={[rehypeKatex]}
+          components={getMarkdownComponents()}
+        >
+          {remainingContent}
+        </ReactMarkdown>
+      </div>
+    )
+  }
+
+  return <>{parts}</>
 }
 
 function getMarkdownComponents() {
@@ -476,12 +468,14 @@ export default function MessageBubble({
     onFeedback?.(type)
   }
 
+  // Find exact position of selected text in the original content using DOM position
   const findTextPosition = (selectedText: string, range: Range): { start: number; end: number } => {
     if (!messageRef.current) {
       return { start: 0, end: 0 }
     }
 
     try {
+      // Get all text nodes in the message
       const walker = document.createTreeWalker(
         messageRef.current,
         NodeFilter.SHOW_TEXT,
@@ -493,11 +487,14 @@ export default function MessageBubble({
       let foundStart = -1
       let foundEnd = -1
 
+      // Walk through all text nodes and find position
       while ((node = walker.nextNode())) {
         const textContent = node.textContent || ''
         
+        // Check if this node contains the start of our selection
         if (range.startContainer === node || range.startContainer.contains(node) || node.contains(range.startContainer)) {
           if (foundStart === -1) {
+            // Calculate offset based on range
             if (range.startContainer === node) {
               foundStart = currentPos + range.startOffset
             } else if (node.contains(range.startContainer)) {
@@ -506,6 +503,7 @@ export default function MessageBubble({
           }
         }
 
+        // Check if this node contains the end of our selection
         if (range.endContainer === node || range.endContainer.contains(node) || node.contains(range.endContainer)) {
           if (range.endContainer === node) {
             foundEnd = currentPos + range.endOffset
@@ -517,6 +515,7 @@ export default function MessageBubble({
         currentPos += textContent.length
       }
 
+      // Fallback: use indexOf if DOM position detection failed
       if (foundStart === -1 || foundEnd === -1) {
         const index = message.content.indexOf(selectedText)
         if (index !== -1) {
@@ -528,6 +527,7 @@ export default function MessageBubble({
       return { start: foundStart, end: foundEnd }
     } catch (error) {
       console.error('Error finding text position:', error)
+      // Fallback to simple search
       const index = message.content.indexOf(selectedText)
       if (index !== -1) {
         return { start: index, end: index + selectedText.length }
@@ -536,6 +536,7 @@ export default function MessageBubble({
     }
   }
 
+  // Handle text selection for threading
   useEffect(() => {
     const handleMouseUp = (e: MouseEvent) => {
       if (!messageRef.current || isUser) return
@@ -585,22 +586,12 @@ export default function MessageBubble({
   const handleCreateThread = () => {
     if (!selectedText) return
 
-    const selection = window.getSelection()
-    if (!selection || selection.rangeCount === 0) return
-    
-    const range = selection.getRangeAt(0)
-    const rect = range.getBoundingClientRect()
-
     const newThread: Thread = {
       id: Date.now().toString(),
       parentText: selectedText,
       messages: [],
       collapsed: false,
-      insertPosition: selectionRange.end,
-      anchorPosition: {
-        top: rect.bottom + window.scrollY,
-        left: rect.right + window.scrollX
-      }
+      insertPosition: selectionRange.end
     }
 
     setThreads([...threads, newThread])
@@ -708,6 +699,7 @@ export default function MessageBubble({
             </div>
           </div>
 
+          {/* Action Buttons */}
           <div className="flex items-center gap-1 mt-3 mb-2">
             <button
               onClick={handleCopy}
