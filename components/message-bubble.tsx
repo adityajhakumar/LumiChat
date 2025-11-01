@@ -4,8 +4,16 @@ import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
-import { Copy, RotateCw, ThumbsUp, ThumbsDown, Check, Edit2 } from "lucide-react"
+import { Copy, RotateCw, ThumbsUp, ThumbsDown, Check, Edit2, MessageSquare, ChevronDown, ChevronRight } from "lucide-react"
 import { useState, useEffect } from "react"
+import { Textarea } from "@/components/ui/textarea"
+
+interface Thread {
+  id: string
+  parentText: string
+  messages: Array<{ role: string; content: string }>
+  collapsed: boolean
+}
 
 interface MessageBubbleProps {
   message: { role: string; content: string }
@@ -13,6 +21,7 @@ interface MessageBubbleProps {
   onEdit?: () => void
   onCopy?: (content: string) => void
   onFeedback?: (type: "positive" | "negative") => void
+  onThreadResponse?: (parentText: string, userMessage: string) => Promise<string>
 }
 
 function CodeBlock({ code, language }: { code: string; language: string }) {
@@ -118,16 +127,104 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
   )
 }
 
+function ThreadSection({ 
+  thread, 
+  onToggle, 
+  onReply, 
+  onThreadResponse 
+}: { 
+  thread: Thread
+  onToggle: () => void
+  onReply: (message: string) => void
+  onThreadResponse?: (parentText: string, userMessage: string) => Promise<string>
+}) {
+  const [replyText, setReplyText] = useState("")
+  const [loading, setLoading] = useState(false)
+
+  const handleSendReply = async () => {
+    if (!replyText.trim()) return
+    
+    setLoading(true)
+    if (onThreadResponse) {
+      await onThreadResponse(thread.parentText, replyText)
+    }
+    onReply(replyText)
+    setReplyText("")
+    setLoading(false)
+  }
+
+  return (
+    <div className="ml-6 mt-3 border-l-2 border-[#3A3A3A] pl-4 bg-[#1A1A1A] rounded-r-lg">
+      {/* Thread Header */}
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-2 text-xs text-[#A0A0A0] hover:text-[#ECECEC] transition-colors mb-2"
+      >
+        {thread.collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+        <MessageSquare size={14} />
+        <span className="font-medium">
+          {thread.messages.length} {thread.messages.length === 1 ? 'reply' : 'replies'} to:
+        </span>
+        <span className="italic truncate max-w-[300px]">"{thread.parentText.substring(0, 50)}..."</span>
+      </button>
+
+      {/* Thread Content */}
+      {!thread.collapsed && (
+        <div className="space-y-3">
+          {thread.messages.map((msg, idx) => (
+            <div key={idx} className={`${msg.role === 'user' ? 'text-right' : 'text-left'}`}>
+              <div className={`inline-block max-w-[90%] px-3 py-2 rounded-lg text-sm ${
+                msg.role === 'user' 
+                  ? 'bg-[#2C2C2C] text-[#ECECEC]' 
+                  : 'bg-[#252525] text-[#D4D4D4]'
+              }`}>
+                {msg.content}
+              </div>
+            </div>
+          ))}
+
+          {/* Reply Input */}
+          <div className="flex gap-2 items-end pt-2 border-t border-[#2A2A2A]">
+            <Textarea
+              value={replyText}
+              onChange={(e) => setReplyText(e.target.value)}
+              placeholder="Reply to this thread..."
+              className="flex-1 min-h-[60px] bg-[#222222] border-[#3A3A3A] text-white placeholder-[#6B6B6B] text-sm"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && e.ctrlKey) {
+                  handleSendReply()
+                }
+              }}
+            />
+            <button
+              onClick={handleSendReply}
+              disabled={loading || !replyText.trim()}
+              className="px-3 py-2 bg-[#CC785C] hover:bg-[#B8674A] disabled:bg-[#6B6B65] text-white rounded-lg text-sm transition-colors"
+            >
+              {loading ? '...' : 'Send'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function MessageBubble({
   message,
   onRegenerate,
   onEdit,
   onCopy,
-  onFeedback
+  onFeedback,
+  onThreadResponse
 }: MessageBubbleProps) {
   const isUser = message.role === "user"
   const [copied, setCopied] = useState(false)
   const [feedback, setFeedback] = useState<"positive" | "negative" | null>(null)
+  const [threads, setThreads] = useState<Thread[]>([])
+  const [selectedText, setSelectedText] = useState("")
+  const [showThreadButton, setShowThreadButton] = useState(false)
+  const [buttonPosition, setButtonPosition] = useState({ x: 0, y: 0 })
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content)
@@ -141,12 +238,98 @@ export default function MessageBubble({
     onFeedback?.(type)
   }
 
+  // Handle text selection for threading
+  const handleTextSelection = () => {
+    const selection = window.getSelection()
+    const text = selection?.toString().trim()
+    
+    if (text && text.length > 10 && !isUser) {
+      setSelectedText(text)
+      
+      // Get selection position for button placement
+      const range = selection?.getRangeAt(0)
+      const rect = range?.getBoundingClientRect()
+      if (rect) {
+        setButtonPosition({
+          x: rect.right + 10,
+          y: rect.top
+        })
+      }
+      setShowThreadButton(true)
+    } else {
+      setShowThreadButton(false)
+    }
+  }
+
+  const handleCreateThread = () => {
+    if (!selectedText) return
+
+    const newThread: Thread = {
+      id: Date.now().toString(),
+      parentText: selectedText,
+      messages: [],
+      collapsed: false
+    }
+
+    setThreads([...threads, newThread])
+    setShowThreadButton(false)
+    setSelectedText("")
+    window.getSelection()?.removeAllRanges()
+  }
+
+  const handleThreadReply = async (threadId: string, message: string) => {
+    const thread = threads.find(t => t.id === threadId)
+    if (!thread) return
+
+    // Add user message
+    const updatedThreads = threads.map(t => 
+      t.id === threadId 
+        ? { ...t, messages: [...t.messages, { role: 'user', content: message }] }
+        : t
+    )
+    setThreads(updatedThreads)
+
+    // Get AI response
+    if (onThreadResponse) {
+      const aiResponse = await onThreadResponse(thread.parentText, message)
+      
+      const finalThreads = updatedThreads.map(t =>
+        t.id === threadId
+          ? { ...t, messages: [...t.messages, { role: 'assistant', content: aiResponse }] }
+          : t
+      )
+      setThreads(finalThreads)
+    }
+  }
+
+  const toggleThread = (threadId: string) => {
+    setThreads(threads.map(t => 
+      t.id === threadId ? { ...t, collapsed: !t.collapsed } : t
+    ))
+  }
+
   return (
     <div
       className={`flex ${
         isUser ? "justify-end" : "justify-start"
-      } mb-6 sm:mb-8 px-4 sm:px-6 group`}
+      } mb-6 sm:mb-8 px-4 sm:px-6 group relative`}
+      onMouseUp={handleTextSelection}
     >
+      {/* Thread Creation Button */}
+      {showThreadButton && (
+        <button
+          onClick={handleCreateThread}
+          className="fixed z-50 bg-[#CC785C] hover:bg-[#B8674A] text-white px-3 py-1.5 rounded-lg shadow-lg text-xs font-medium flex items-center gap-1 transition-colors"
+          style={{
+            left: `${buttonPosition.x}px`,
+            top: `${buttonPosition.y}px`
+          }}
+        >
+          <MessageSquare size={14} />
+          Start Thread
+        </button>
+      )}
+
       {isUser ? (
         <div className="max-w-[85%] sm:max-w-[75%]">
           <div className="px-4 sm:px-5 py-3 sm:py-3.5 rounded-2xl sm:rounded-3xl bg-[#2C2C2C] text-[#ECECEC] shadow-lg border border-[#3A3A3A]">
@@ -161,7 +344,6 @@ export default function MessageBubble({
             </p>
           </div>
           
-          {/* Edit button for user messages */}
           {onEdit && (
             <div className="flex items-center gap-1 mt-2 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
               <button
@@ -253,6 +435,21 @@ export default function MessageBubble({
               </ReactMarkdown>
             </div>
           </div>
+
+          {/* Threads */}
+          {threads.length > 0 && (
+            <div className="mt-4 space-y-3">
+              {threads.map(thread => (
+                <ThreadSection
+                  key={thread.id}
+                  thread={thread}
+                  onToggle={() => toggleThread(thread.id)}
+                  onReply={(msg) => handleThreadReply(thread.id, msg)}
+                  onThreadResponse={onThreadResponse}
+                />
+              ))}
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex items-center gap-1 mt-3 mb-2">

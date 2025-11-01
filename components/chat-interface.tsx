@@ -292,6 +292,42 @@ export default function ChatInterface({
     setTimeout(() => scrollToBottom(true), 100)
   }
 
+  // Handler for threaded responses
+  const handleThreadResponse = async (parentText: string, userMessage: string): Promise<string> => {
+    try {
+      const threadMessages = [
+        { 
+          role: "system", 
+          content: `The user is asking a follow-up question about this specific part of your previous response: "${parentText}". Please provide a focused answer that directly addresses their question in the context of this excerpt.` 
+        },
+        { role: "user", content: userMessage }
+      ]
+
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [...messages, ...threadMessages],
+          model: selectedModel,
+          studyMode: false,
+        }),
+      })
+
+      const data = await response.json()
+      
+      if (data.error) {
+        console.error(data.error)
+        return "Sorry, I couldn't generate a response. Please try again."
+      }
+
+      onTokenCountChange(data.tokenCount || 0)
+      return data.content || "Sorry, I couldn't generate a response."
+    } catch (err) {
+      console.error("Thread response error:", err)
+      return "Sorry, an error occurred. Please try again."
+    }
+  }
+
   const handleFollowUpQuestion = async () => {
     if (!followUpInput.trim()) return
 
@@ -549,6 +585,7 @@ Format as JSON with this structure:
                     message={msg}
                     onEdit={msg.role === "user" ? () => handleEditMessage(i) : undefined}
                     onRegenerate={msg.role === "assistant" ? () => handleRegenerateResponse(i) : undefined}
+                    onThreadResponse={msg.role === "assistant" ? handleThreadResponse : undefined}
                   />
                 )}
               </div>
