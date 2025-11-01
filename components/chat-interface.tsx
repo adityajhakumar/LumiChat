@@ -64,18 +64,16 @@ export default function ChatInterface({
     }
   }, [currentStudySession])
 
-  // Smart scroll behavior - improved
+  // Improved scroll behavior - no forced smooth scrolling
   const scrollToBottom = (force = false) => {
     if (!messagesContainerRef.current || !messagesEndRef.current) return
     
     const container = messagesContainerRef.current
-    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
     
-    // Only auto-scroll if user is near bottom OR force is true (new message sent)
-    if (force || isNearBottom || !userScrolled) {
-      requestAnimationFrame(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" })
-      })
+    if (force || isNearBottom) {
+      // Use instant scroll instead of smooth for better performance
+      messagesEndRef.current.scrollIntoView({ behavior: "auto", block: "end" })
       setUserScrolled(false)
     }
   }
@@ -85,29 +83,29 @@ export default function ChatInterface({
     const container = messagesContainerRef.current
     if (!container) return
 
-    let scrollTimeout: NodeJS.Timeout
-
     const handleScroll = () => {
-      clearTimeout(scrollTimeout)
-      scrollTimeout = setTimeout(() => {
-        const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 200
-        setUserScrolled(!isAtBottom)
-      }, 150)
+      const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
+      if (!isAtBottom && !userScrolled) {
+        setUserScrolled(true)
+      } else if (isAtBottom && userScrolled) {
+        setUserScrolled(false)
+      }
     }
 
     container.addEventListener("scroll", handleScroll, { passive: true })
     return () => {
       container.removeEventListener("scroll", handleScroll)
-      clearTimeout(scrollTimeout)
     }
-  }, [])
+  }, [userScrolled])
 
-  // Auto-scroll only when new messages arrive
+  // Auto-scroll when new messages arrive
   useEffect(() => {
-    if (messages.length > 0) {
-      setTimeout(() => scrollToBottom(), 100)
+    if (messages.length > 0 && !userScrolled) {
+      // Small delay to ensure DOM is updated
+      const timeoutId = setTimeout(() => scrollToBottom(true), 50)
+      return () => clearTimeout(timeoutId)
     }
-  }, [messages.length])
+  }, [messages.length, userScrolled])
 
   // --- Paste Image Support ---
   useEffect(() => {
@@ -213,7 +211,7 @@ export default function ChatInterface({
     setAttachedFile(null)
 
     // Force scroll after sending message
-    setTimeout(() => scrollToBottom(true), 100)
+    setTimeout(() => scrollToBottom(true), 50)
 
     const data = await sendMessageToAPI(newMessages)
     if (!data) return
@@ -243,7 +241,7 @@ export default function ChatInterface({
     onTokenCountChange(data.tokenCount || 0)
     
     // Force scroll after receiving response
-    setTimeout(() => scrollToBottom(true), 100)
+    setTimeout(() => scrollToBottom(true), 50)
   }
 
   const handleEditMessage = (index: number) => {
@@ -276,7 +274,7 @@ export default function ChatInterface({
     onMessagesChange([...messagesToKeep, assistantMessage])
     onTokenCountChange(data.tokenCount || 0)
     
-    setTimeout(() => scrollToBottom(true), 100)
+    setTimeout(() => scrollToBottom(true), 50)
   }
 
   const handleCancelEdit = () => {
@@ -298,7 +296,7 @@ export default function ChatInterface({
     onMessagesChange([...messagesToKeep, assistantMessage])
     onTokenCountChange(data.tokenCount || 0)
     
-    setTimeout(() => scrollToBottom(true), 100)
+    setTimeout(() => scrollToBottom(true), 50)
   }
 
   // Handler for threaded responses
@@ -551,8 +549,7 @@ Format as JSON with this structure:
       {/* Messages */}
       <div 
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto scroll-smooth"
-        style={{ scrollBehavior: 'smooth' }}
+        className="flex-1 overflow-y-auto"
       >
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-2">
         {messages.length === 0 ? (
