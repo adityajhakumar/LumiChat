@@ -301,8 +301,30 @@ function ContentWithThreads({
   let lastIndex = 0
 
   sortedThreads.forEach((thread, idx) => {
+    let insertPos = thread.insertPosition
+    
+    // Check if we're inside a code block
+    const beforeText = content.substring(0, insertPos)
+    const afterText = content.substring(insertPos)
+    
+    // Count code block markers before and after the position
+    const codeBlocksBefore = (beforeText.match(/```/g) || []).length
+    const isInsideCodeBlock = codeBlocksBefore % 2 !== 0
+    
+    if (isInsideCodeBlock) {
+      // Find the end of the current code block
+      const codeBlockEnd = afterText.indexOf('```')
+      if (codeBlockEnd !== -1) {
+        insertPos = insertPos + codeBlockEnd + 3 // Move past the closing ```
+        // Skip any whitespace after code block
+        while (insertPos < content.length && /\s/.test(content[insertPos])) {
+          insertPos++
+        }
+      }
+    }
+    
     // Add content up to and including the selected text
-    const beforeContent = content.substring(lastIndex, thread.insertPosition)
+    const beforeContent = content.substring(lastIndex, insertPos)
     if (beforeContent) {
       parts.push(
         <div key={`content-${idx}`}>
@@ -328,7 +350,7 @@ function ContentWithThreads({
       />
     )
 
-    lastIndex = thread.insertPosition
+    lastIndex = insertPos
   })
 
   // Add remaining content after last thread
