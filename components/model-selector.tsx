@@ -4,75 +4,52 @@ import { useState, useRef, useEffect } from "react"
 import { Camera, Code, Brain, Sparkles, MessageSquare, Bot, ChevronDown } from "lucide-react"
 
 const MODELS = [
-  // --- Existing Models ---
-  { id: "mistralai/devstral-small-2505:free", name: "DevStral Small 2505", shortName: "DevStral", provider: "Mistral" },
-  { id: "minimax/minimax-m2:free", name: "MiniMax M2", shortName: "MiniMax M2", provider: "MiniMax" },
-  { id: "openai/gpt-oss-20b:free", name: "GPT-OSS 20B", shortName: "GPT-OSS", provider: "OpenAI" },
-  { id: "qwen/qwen3-coder:free", name: "Qwen 3 Coder", shortName: "Qwen Coder", provider: "Alibaba / Qwen" },
-  { id: "google/gemma-3n-e2b-it:free", name: "Gemma 3n E2B Instruct", shortName: "Gemma 3n", provider: "Google" },
-  { id: "mistralai/mistral-small-3.2-24b-instruct:free", name: "Mistral Small 3.2 24B", shortName: "Mistral Small", provider: "Mistral" },
-  { id: "meta-llama/llama-3.3-8b-instruct:free", name: "Llama 3.3 8B Instruct", shortName: "Llama 3.3 8B", provider: "Meta" },
-  { id: "google/gemma-3-4b-it:free", name: "Gemma 3 4B Instruct", shortName: "Gemma 3 4B", provider: "Google" },
-  { id: "google/gemini-2.0-flash-exp:free", name: "Gemini 2.0 Flash Exp", shortName: "Gemini 2.0", provider: "Google" },
+  // --- MULTIMODAL ---
+  { id: "google/gemini-2.0-flash-exp:free", name: "Gemini 2.0 Flash Experimental", shortName: "Gemini 2.0", provider: "Google", category: "Multimodal" },
+  { id: "google/gemma-3n-e2b-it:free", name: "Gemma 3n E2B Instruct", shortName: "Gemma 3n", provider: "Google", category: "Multimodal" },
+  { id: "google/gemma-3-4b-it:free", name: "Gemma 3 4B Instruct", shortName: "Gemma 3 4B", provider: "Google", category: "Multimodal" },
+  { id: "google/gemma-3-12b-it:free", name: "Gemma 3 12B Instruct", shortName: "Gemma 3 12B", provider: "Google", category: "Multimodal" },
+  { id: "google/gemma-3-27b-it:free", name: "Gemma 3 27B Instruct", shortName: "Gemma 27B", provider: "Google", category: "Multimodal" },
+  { id: "qwen/qwen2.5-vl-32b-instruct:free", name: "Qwen2.5 VL 32B", shortName: "Qwen VL", provider: "Alibaba / Qwen", category: "Multimodal" },
+  { id: "nvidia/nemotron-nano-12b-v2-vl:free", name: "Nemotron Nano 12B V2 VL", shortName: "Nemotron VL", provider: "NVIDIA", category: "Multimodal" },
+  { id: "meta-llama/llama-4-maverick:free", name: "Llama 4 Maverick", shortName: "Llama 4 Maverick", provider: "Meta", category: "Multimodal" },
+  { id: "meta-llama/llama-4-scout:free", name: "Llama 4 Scout", shortName: "Llama 4 Scout", provider: "Meta", category: "Multimodal" },
 
-  // --- New Models ---
-  { id: "openrouter/andromeda-alpha", name: "Andromeda Alpha", shortName: "Andromeda", provider: "OpenRouter" },
-  { id: "meta-llama/llama-4-maverick:free", name: "Llama 4 Maverick", shortName: "Llama 4 Maverick", provider: "Meta" },
-  { id: "meta-llama/llama-4-scout:free", name: "Llama 4 Scout", shortName: "Llama 4 Scout", provider: "Meta" },
-  { id: "qwen/qwen2.5-vl-32b-instruct:free", name: "Qwen2.5 VL 32B", shortName: "Qwen VL", provider: "Alibaba / Qwen" },
-  { id: "mistralai/mistral-small-3.1-24b-instruct:free", name: "Mistral Small 3.1 24B", shortName: "Mistral 3.1", provider: "Mistral" },
-  { id: "google/gemma-3-27b-it:free", name: "Gemma 3 27B Instruct", shortName: "Gemma 27B", provider: "Google" },
-  { id: "nvidia/nemotron-nano-9b-v2:free", name: "Nemotron Nano 9B V2", shortName: "Nemotron", provider: "NVIDIA" },
-  { id: "alibaba/tongyi-deepresearch-30b-a3b:free", name: "Tongyi DeepResearch 30B", shortName: "Tongyi", provider: "Alibaba" },
-  { id: "moonshotai/kimi-k2:free", name: "Kimi K2 0711", shortName: "Kimi K2", provider: "MoonshotAI" },
-  { id: "tngtech/deepseek-r1t2-chimera:free", name: "DeepSeek R1T2 Chimera", shortName: "DeepSeek", provider: "TNG Tech" },
-  { id: "qwen/qwen3-14b:free", name: "Qwen3 14B", shortName: "Qwen3 14B", provider: "Alibaba / Qwen" },
-  { id: "arliai/qwq-32b-arliai-rpr-v1:free", name: "QwQ 32B RpR v1", shortName: "QwQ 32B", provider: "ArliAI" },
+  // --- REASONING ---
+  { id: "deepseek/deepseek-r1-distill-llama-70b:free", name: "DeepSeek R1 Distill Llama 70B", shortName: "DeepSeek R1", provider: "DeepSeek", category: "Reasoning" },
+  { id: "tngtech/deepseek-r1t2-chimera:free", name: "DeepSeek R1T2 Chimera", shortName: "DeepSeek Chimera", provider: "TNG Tech", category: "Reasoning" },
+  { id: "alibaba/tongyi-deepresearch-30b-a3b:free", name: "Tongyi DeepResearch 30B", shortName: "Tongyi", provider: "Alibaba", category: "Reasoning" },
+  { id: "arliai/qwq-32b-arliai-rpr-v1:free", name: "QwQ 32B RpR v1", shortName: "QwQ 32B", provider: "ArliAI", category: "Reasoning" },
+
+  // --- CODING ---
+  { id: "qwen/qwen3-coder:free", name: "Qwen 3 Coder", shortName: "Qwen Coder", provider: "Alibaba / Qwen", category: "Coding" },
+  { id: "mistralai/devstral-small-2505:free", name: "DevStral Small 2505", shortName: "DevStral", provider: "Mistral", category: "Coding" },
+
+  // --- AGENTIC ---
+  { id: "openai/gpt-oss-20b:free", name: "GPT-OSS 20B", shortName: "GPT-OSS", provider: "OpenAI", category: "Agentic" },
+  { id: "minimax/minimax-m2:free", name: "MiniMax M2", shortName: "MiniMax M2", provider: "MiniMax", category: "Agentic" },
+  { id: "openrouter/andromeda-alpha", name: "Andromeda Alpha", shortName: "Andromeda", provider: "OpenRouter", category: "Agentic" },
+
+  // --- GENERAL ---
+  { id: "meta-llama/llama-3.2-3b-instruct:free", name: "Llama 3.2 3B Instruct", shortName: "Llama 3.2 3B", provider: "Meta", category: "General" },
+  { id: "meta-llama/llama-3.3-8b-instruct:free", name: "Llama 3.3 8B Instruct", shortName: "Llama 3.3 8B", provider: "Meta", category: "General" },
+  { id: "meta-llama/llama-3.3-70b-instruct:free", name: "Llama 3.3 70B Instruct", shortName: "Llama 3.3 70B", provider: "Meta", category: "General" },
+  { id: "shisa-ai/shisa-v2-llama3.3-70b:free", name: "Shisa V2 Llama 3.3 70B", shortName: "Shisa V2", provider: "Shisa AI", category: "General" },
+  { id: "mistralai/mistral-small-3.1-24b-instruct:free", name: "Mistral Small 3.1 24B", shortName: "Mistral 3.1", provider: "Mistral", category: "General" },
+  { id: "mistralai/mistral-small-3.2-24b-instruct:free", name: "Mistral Small 3.2 24B", shortName: "Mistral 3.2", provider: "Mistral", category: "General" },
+  { id: "qwen/qwen3-14b:free", name: "Qwen3 14B Instruct", shortName: "Qwen3 14B", provider: "Alibaba / Qwen", category: "General" },
+  { id: "nvidia/nemotron-nano-9b-v2:free", name: "Nemotron Nano 9B V2", shortName: "Nemotron", provider: "NVIDIA", category: "General" },
+
+  // --- CREATIVE ---
+  { id: "moonshotai/kimi-k2:free", name: "Kimi K2 0711", shortName: "Kimi K2", provider: "MoonshotAI", category: "Creative" },
 ]
 
-// ✅ Enhanced Categorization Logic (includes known multimodal models)
-function getCategory(name: string, id: string) {
-  const lower = name.toLowerCase()
-  const idLower = id.toLowerCase()
-
-  // ✅ Multimodal / Vision models (explicit + keyword-based)
-  const multimodalList = [
-    "qwen2.5-vl",
-    "gemini-2.0-flash",
-    "gemma-3n-e2b",
-    "gpt-4v",
-    "vision",
-    "multimodal",
-  ]
-  if (multimodalList.some((m) => idLower.includes(m) || lower.includes(m))) return "Multimodal"
-
-  // ✅ Agentic / Reasoning Assistants
-  if (
-    lower.includes("agent") ||
-    lower.includes("agentic") ||
-    lower.includes("maverick") ||
-    lower.includes("scout") ||
-    lower.includes("andromeda") ||
-    lower.includes("deepresearch") ||
-    idLower.includes("agent")
-  )
-    return "Agentic"
-
-  // ✅ Coding models
-  if (lower.includes("code") || lower.includes("coder") || lower.includes("devstral")) return "Coding"
-
-  // ✅ Reasoning-heavy models
-  if (lower.includes("deepseek") || lower.includes("reason") || lower.includes("chimera") || lower.includes("rpr"))
-    return "Reasoning"
-
-  // ✅ Creative / Chatty / Roleplay models
-  if (lower.includes("creative") || lower.includes("roleplay") || lower.includes("kimi")) return "Creative"
-
-  // ✅ Default
-  return "General"
+// ✅ Get category from model definition
+function getCategory(model: typeof MODELS[0]) {
+  return model.category
 }
 
-// 🎨 Icon mapping
+// 🎨 Icons for categories
 function getIcon(category: string) {
   switch (category) {
     case "Coding":
@@ -113,7 +90,7 @@ export default function ModelSelector({
   }, [])
 
   const groupedModels = MODELS.reduce((acc, model) => {
-    const cat = getCategory(model.name, model.id)
+    const cat = getCategory(model)
     if (!acc[cat]) acc[cat] = []
     acc[cat].push(model)
     return acc
@@ -146,8 +123,7 @@ export default function ModelSelector({
                 {getIcon(category)} {category}
               </div>
               {models.map((model) => {
-                const isRecommended = hasImage && getCategory(model.name, model.id) === "Multimodal"
-
+                const isRecommended = hasImage && model.category === "Multimodal"
                 return (
                   <button
                     key={model.id}
