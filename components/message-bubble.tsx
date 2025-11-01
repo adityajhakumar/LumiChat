@@ -170,11 +170,17 @@ function ThreadSection({
   }
 
   // Calculate positions for the connector line and thread box
-  const threadBoxLeft = anchorPosition.left + 50
+  const viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200
+  
+  // Get the thread box position (fixed to right edge)
+  const threadBoxRightEdge = viewportWidth - 20 // 20px from right edge
+  const threadBoxWidth = thread.collapsed ? 280 : 380
+  const threadBoxLeft = threadBoxRightEdge - threadBoxWidth
+  
   const lineStartX = anchorPosition.left
   const lineStartY = anchorPosition.top
-  const lineEndX = threadBoxLeft - 20
-  const lineEndY = anchorPosition.top + 40
+  const lineEndX = threadBoxLeft - 10 // Point to left edge of thread box
+  const lineEndY = anchorPosition.top + 20
 
   return (
     <>
@@ -190,22 +196,31 @@ function ThreadSection({
       >
         <defs>
           <linearGradient id={`gradient-${thread.id}`} x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#CC785C" stopOpacity="0.3" />
-            <stop offset="100%" stopColor="#CC785C" stopOpacity="0.8" />
+            <stop offset="0%" stopColor="#CC785C" stopOpacity="0.5" />
+            <stop offset="100%" stopColor="#CC785C" stopOpacity="0.9" />
           </linearGradient>
         </defs>
         <path
-          d={`M ${lineStartX} ${lineStartY} Q ${lineStartX + (lineEndX - lineStartX) / 2} ${lineStartY}, ${lineEndX} ${lineEndY}`}
+          d={`M ${lineStartX} ${lineStartY} C ${lineStartX + 100} ${lineStartY}, ${lineEndX - 100} ${lineEndY}, ${lineEndX} ${lineEndY}`}
           stroke={`url(#gradient-${thread.id})`}
-          strokeWidth="2"
+          strokeWidth="2.5"
           fill="none"
-          strokeDasharray={thread.collapsed ? "5,5" : "none"}
+          strokeDasharray={thread.collapsed ? "8,4" : "none"}
           className="transition-all duration-300"
         />
-        <polygon
-          points={`${lineEndX},${lineEndY} ${lineEndX - 6},${lineEndY - 4} ${lineEndX - 6},${lineEndY + 4}`}
+        {/* Connection point at start */}
+        <circle
+          cx={lineStartX}
+          cy={lineStartY}
+          r="4"
           fill="#CC785C"
           opacity="0.8"
+        />
+        {/* Arrowhead at end */}
+        <polygon
+          points={`${lineEndX},${lineEndY} ${lineEndX - 8},${lineEndY - 5} ${lineEndX - 8},${lineEndY + 5}`}
+          fill="#CC785C"
+          opacity="0.9"
         />
       </svg>
 
@@ -214,14 +229,14 @@ function ThreadSection({
         ref={threadBoxRef}
         className="fixed z-50 transition-all duration-300 ease-out"
         style={{
-          left: `${threadBoxLeft}px`,
+          right: '20px', // Fixed to right edge with padding
           top: `${anchorPosition.top - 20}px`,
-          maxWidth: thread.collapsed ? '280px' : '400px',
-          width: thread.collapsed ? '280px' : '400px',
+          maxWidth: thread.collapsed ? '280px' : '380px',
+          width: thread.collapsed ? '280px' : '380px',
         }}
       >
-        <div className={`bg-[#1A1A1A] rounded-xl shadow-2xl border-2 border-[#CC785C] overflow-hidden transition-all duration-300 ${
-          thread.collapsed ? 'max-h-[120px]' : 'max-h-[600px]'
+        <div className={`bg-[#1A1A1A] rounded-xl shadow-2xl border-2 border-[#CC785C]/60 overflow-hidden transition-all duration-300 backdrop-blur-sm ${
+          thread.collapsed ? 'max-h-[140px]' : 'max-h-[70vh]'
         }`}>
           <div className="flex items-center justify-between p-3 bg-gradient-to-r from-[#CC785C]/20 to-transparent border-b border-[#CC785C]/30">
             <button
