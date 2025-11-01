@@ -27,27 +27,6 @@ interface ChatInterfaceProps {
   currentStudySession?: any
 }
 
-// Streaming Message Component
-function StreamingMessage({ content }: { content: string }) {
-  return (
-    <div className="mb-6 sm:mb-8 px-4 sm:px-6">
-      <div className="w-full max-w-full sm:max-w-[90%] md:max-w-[85%]">
-        <div className="bg-transparent text-[#ECECEC] py-1">
-          <div
-            className="prose prose-invert max-w-none prose-p:leading-7 prose-p:my-4"
-            style={{ fontFamily: '"Tiempos Text", Charter, Georgia, serif' }}
-          >
-            <p className="my-4 leading-7 text-[#ECECEC] whitespace-pre-wrap">
-              {content}
-              <span className="inline-block w-1 h-5 bg-[#CC785C] ml-1 animate-pulse" />
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
 export default function ChatInterface({
   selectedModel,
   onModelChange,
@@ -73,8 +52,6 @@ export default function ChatInterface({
   const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null)
   const [editedContent, setEditedContent] = useState("")
   const [userScrolled, setUserScrolled] = useState(false)
-  const [isStreaming, setIsStreaming] = useState(false)
-  const [streamingContent, setStreamingContent] = useState("")
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -94,12 +71,14 @@ export default function ChatInterface({
     const container = messagesContainerRef.current
     const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150
     
+    // Only auto-scroll if user is near bottom OR force is true (new message sent)
     if (force || isNearBottom || !userScrolled) {
       messagesEndRef.current.scrollIntoView({ behavior: "smooth" })
       setUserScrolled(false)
     }
   }
 
+  // Detect user manual scrolling
   useEffect(() => {
     const container = messagesContainerRef.current
     if (!container) return
@@ -113,12 +92,15 @@ export default function ChatInterface({
     return () => container.removeEventListener("scroll", handleScroll)
   }, [])
 
+  // Auto-scroll only when new messages arrive
   useEffect(() => {
-    if (messages.length > 0 || isStreaming) {
+    if (messages.length > 0) {
+      // Use setTimeout to ensure DOM has updated
       setTimeout(() => scrollToBottom(), 100)
     }
-  }, [messages.length, isStreaming, streamingContent])
+  }, [messages.length])
 
+  // --- Paste Image Support ---
   useEffect(() => {
     const handlePaste = (event: ClipboardEvent) => {
       if (!event.clipboardData) return
@@ -177,8 +159,6 @@ export default function ChatInterface({
 
   const sendMessageToAPI = async (messagesToSend: Array<{ role: string; content: string }>) => {
     setLoading(true)
-    setIsStreaming(true)
-    setStreamingContent("")
     
     try {
       const response = await fetch("/api/chat", {
@@ -190,75 +170,19 @@ export default function ChatInterface({
           image: attachedImage,
           file: attachedFile,
           studyMode: studyMode,
-          stream: !studyMode, // Only stream in regular chat mode
         }),
       })
-
-      if (!response.ok) {
-        const data = await response.json()
-        console.error(data.error)
-        setIsStreaming(false)
-        return null
-      }
-
-      // Handle streaming for regular chat
-      if (!studyMode && response.body) {
-        const reader = response.body.getReader()
-        const decoder = new TextDecoder()
-        let fullContent = ""
-        
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          
-          const chunk = decoder.decode(value, { stream: true })
-          const lines = chunk.split('\n')
-          
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const jsonStr = line.slice(6).trim()
-                if (jsonStr === '[DONE]') continue
-                if (!jsonStr) continue
-                
-                const data = JSON.parse(jsonStr)
-                
-                if (data.content) {
-                  fullContent += data.content
-                  setStreamingContent(fullContent)
-                }
-                
-                if (data.tokenCount) {
-                  onTokenCountChange(data.tokenCount)
-                }
-              } catch (e) {
-                console.error('Parse error:', e)
-              }
-            }
-          }
-        }
-        
-        setIsStreaming(false)
-        setLoading(false)
-        return { content: fullContent, tokenCount: 0 }
-      }
-      
-      // Non-streaming fallback (for study mode)
       const data = await response.json()
-      setIsStreaming(false)
-      setLoading(false)
-      
       if (data.error) {
         console.error(data.error)
         return null
       }
       return data
-      
     } catch (err) {
       console.error(err)
-      setIsStreaming(false)
-      setLoading(false)
       return null
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -279,6 +203,7 @@ export default function ChatInterface({
     setAttachedImage(null)
     setAttachedFile(null)
 
+    // Force scroll after sending message
     setTimeout(() => scrollToBottom(true), 100)
 
     const data = await sendMessageToAPI(newMessages)
@@ -301,13 +226,14 @@ export default function ChatInterface({
     } else {
       const assistantMessage = { 
         role: "assistant", 
-        content: data.content || streamingContent
+        content: data.content
       }
       onMessagesChange([...newMessages, assistantMessage])
-      setStreamingContent("")
     }
 
     onTokenCountChange(data.tokenCount || 0)
+    
+    // Force scroll after receiving response
     setTimeout(() => scrollToBottom(true), 100)
   }
 
@@ -336,10 +262,9 @@ export default function ChatInterface({
     
     const assistantMessage = { 
       role: "assistant", 
-      content: data.content || streamingContent
+      content: data.content
     }
     onMessagesChange([...messagesToKeep, assistantMessage])
-    setStreamingContent("")
     onTokenCountChange(data.tokenCount || 0)
     
     setTimeout(() => scrollToBottom(true), 100)
@@ -359,10 +284,9 @@ export default function ChatInterface({
     
     const assistantMessage = { 
       role: "assistant", 
-      content: data.content || streamingContent
+      content: data.content
     }
     onMessagesChange([...messagesToKeep, assistantMessage])
-    setStreamingContent("")
     onTokenCountChange(data.tokenCount || 0)
     
     setTimeout(() => scrollToBottom(true), 100)
@@ -482,6 +406,7 @@ Format as JSON with this structure:
   if (studyMode) {
     return (
       <div ref={containerRef} className="flex h-full bg-[#1E1E1E] text-white overflow-hidden">
+        {/* Left side - Lessons or Quiz */}
         <div style={{ width: `${dividerPos}%` }} className="flex flex-col overflow-hidden border-r border-[#2E2E2E]">
           {quizMode && quizData ? (
             <QuizMode quizData={quizData} onComplete={handleQuizComplete} topic={currentTopic} />
@@ -513,6 +438,7 @@ Format as JSON with this structure:
             </>
           ) : (
             <>
+              {/* Initial prompt area */}
               <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-2">
                 <div className="flex items-center justify-center h-full text-center px-4">
                   <div>
@@ -524,6 +450,7 @@ Format as JSON with this structure:
                 </div>
               </div>
 
+              {/* Input for initial question */}
               <div className="border-t border-[#2E2E2E] bg-[#171717] p-3 md:p-6 flex-shrink-0">
                 <div className="flex flex-col md:flex-row gap-2 md:gap-3">
                   <div className="flex-1">
@@ -550,6 +477,7 @@ Format as JSON with this structure:
           )}
         </div>
 
+        {/* Divider */}
         <div
           onMouseDown={() => setIsDragging(true)}
           className="w-1 bg-[#2E2E2E] hover:bg-[#CC785C] cursor-col-resize transition-colors flex items-center justify-center group"
@@ -560,6 +488,7 @@ Format as JSON with this structure:
           />
         </div>
 
+        {/* Right side - Code Editor */}
         <div style={{ width: `${100 - dividerPos}%` }} className="flex flex-col overflow-hidden">
           <CodeEditor
             language={codeLanguage}
@@ -574,12 +503,13 @@ Format as JSON with this structure:
 
   return (
     <div className="flex flex-col h-full bg-[#1E1E1E] text-white overflow-hidden">
+      {/* Messages */}
       <div 
         ref={messagesContainerRef}
         className="flex-1 overflow-y-auto"
       >
         <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-2">
-        {messages.length === 0 && !isStreaming ? (
+        {messages.length === 0 ? (
           <div className="flex items-center justify-center min-h-full text-center px-4">
             <div className="flex flex-col items-center justify-center gap-2 md:gap-3">
               <h1 className="text-3xl sm:text-4xl md:text-5xl font-light text-[#CC785C] tracking-tight">LumiChat</h1>
@@ -623,12 +553,7 @@ Format as JSON with this structure:
                 )}
               </div>
             ))}
-            
-            {isStreaming && streamingContent && (
-              <StreamingMessage content={streamingContent} />
-            )}
-            
-            {loading && !isStreaming && (
+            {loading && (
               <div className="mb-4">
                 <div className="bg-[#2A2A2A] rounded-xl px-4 py-3 inline-block">
                   <div className="flex space-x-2">
@@ -645,6 +570,7 @@ Format as JSON with this structure:
         </div>
       </div>
 
+      {/* Scroll to Bottom Button - Shows when user scrolled up */}
       {userScrolled && (
         <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 z-10">
           <button
@@ -657,8 +583,10 @@ Format as JSON with this structure:
         </div>
       )}
 
+      {/* Input - Claude Style - Mobile Optimized */}
       <div className="bg-[#1E1E1E] px-3 sm:px-4 pb-4 sm:pb-6 pt-3 sm:pt-4 flex-shrink-0">
         <div className="max-w-3xl mx-auto">
+          {/* Model Selector - Mobile Only */}
           <div className="sm:hidden mb-3">
             <ModelSelector 
               selectedModel={selectedModel} 
@@ -667,6 +595,7 @@ Format as JSON with this structure:
             />
           </div>
 
+          {/* Attached Files Preview */}
           {attachedImage && (
             <div className="mb-2 sm:mb-3 relative inline-block">
               <img
@@ -697,7 +626,9 @@ Format as JSON with this structure:
             </div>
           )}
           
+          {/* Input Container - Mobile Optimized */}
           <div className="relative bg-[#2A2A2A] rounded-2xl sm:rounded-3xl border border-[#3A3A3A] focus-within:border-[#4A4A4A] transition-colors shadow-lg">
+            {/* Attachment buttons - LEFT Side */}
             <div className="absolute left-3 sm:left-4 bottom-[14px] sm:bottom-4 flex items-center gap-1 z-10">
               <ImageUpload onImageSelect={setAttachedImage} />
               <FileUpload onFileSelect={handleFileSelect} />
@@ -715,7 +646,9 @@ Format as JSON with this structure:
               style={{ minHeight: '56px', maxHeight: '200px' }}
             />
             
+            {/* Model Selector + Send Button - RIGHT Side */}
             <div className="absolute right-3 sm:right-4 bottom-[14px] sm:bottom-4 flex items-center gap-2">
+              {/* Model Selector - Desktop */}
               <div className="hidden sm:block">
                 <ModelSelector 
                   selectedModel={selectedModel} 
@@ -724,6 +657,7 @@ Format as JSON with this structure:
                 />
               </div>
               
+              {/* Send Button */}
               <button
                 onClick={handleSendMessage}
                 disabled={loading || (!input.trim() && !attachedImage && !attachedFile)}
