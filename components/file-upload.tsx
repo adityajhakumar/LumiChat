@@ -198,6 +198,8 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
           
           // Cleanup
           page.cleanup()
+        } catch (pageErr) {
+          console.warn(`Error processing page ${pageNum}:`, pageErr)
           // Continue with other pages
         }
       }
