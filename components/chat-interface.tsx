@@ -41,6 +41,7 @@ export default function ChatInterface({
   const [loading, setLoading] = useState(false)
   const [attachedImage, setAttachedImage] = useState<string | null>(null)
   const [attachedFile, setAttachedFile] = useState<{ content: string; name: string } | null>(null)
+  const [pdfImages, setPdfImages] = useState<string[]>([]) // Store PDF page images
   const [codeLanguage, setCodeLanguage] = useState("python")
   const [lessonSteps, setLessonSteps] = useState<any[]>([])
   const [followUpInput, setFollowUpInput] = useState("")
@@ -157,11 +158,15 @@ export default function ChatInterface({
 
   const handleFileSelect = (content: string, fileName: string) => {
     setAttachedFile({ content, name: fileName })
-    setInput(
-      (prev) =>
-        prev +
-        `\n\n[File attached: ${fileName}]\n\`\`\`\n${content.substring(0, 500)}${content.length > 500 ? "..." : ""}\n\`\`\``,
-    )
+    // Show a visual indicator that file is attached
+    if (!input.trim()) {
+      setInput("Analyze this document")
+    }
+  }
+
+  const handlePdfImagesExtracted = (images: string[], fileName: string) => {
+    setPdfImages(images)
+    // Images are stored separately for vision analysis
   }
 
   const sendMessageToAPI = async (messagesToSend: Array<{ role: string; content: string }>) => {
@@ -175,7 +180,9 @@ export default function ChatInterface({
           messages: messagesToSend,
           model: selectedModel,
           image: attachedImage,
-          file: attachedFile,
+          images: pdfImages.length > 0 ? pdfImages : undefined, // Send PDF images
+          fileContent: attachedFile?.content,  // Send file text content
+          fileName: attachedFile?.name,        // Send file name
           studyMode: studyMode,
         }),
       })
@@ -209,6 +216,7 @@ export default function ChatInterface({
     setInput("")
     setAttachedImage(null)
     setAttachedFile(null)
+    setPdfImages([]) // Clear PDF images after sending
 
     // Force scroll after sending message
     setTimeout(() => scrollToBottom(true), 50)
@@ -659,10 +667,18 @@ Format as JSON with this structure:
             <div className="mb-2 sm:mb-3 p-2 sm:p-3 rounded-lg bg-[#2A2A2A] border border-[#3A3A3A] flex items-center justify-between">
               <div className="flex items-center gap-2 min-w-0">
                 <FileText size={16} className="text-[#CC785C] flex-shrink-0" />
-                <span className="text-xs sm:text-sm text-[#9B9B95] truncate">{attachedFile.name}</span>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs sm:text-sm text-white truncate">{attachedFile.name}</span>
+                  {pdfImages.length > 0 && (
+                    <span className="text-xs text-[#6B6B65]">{pdfImages.length} pages extracted</span>
+                  )}
+                </div>
               </div>
               <button
-                onClick={() => setAttachedFile(null)}
+                onClick={() => {
+                  setAttachedFile(null)
+                  setPdfImages([])
+                }}
                 className="ml-2 text-[#6B6B65] hover:text-[#D65D5D] transition flex-shrink-0"
               >
                 <X size={16} />
@@ -675,7 +691,10 @@ Format as JSON with this structure:
             {/* Attachment buttons - LEFT Side */}
             <div className="absolute left-3 sm:left-4 bottom-[14px] sm:bottom-4 flex items-center gap-1 z-10">
               <ImageUpload onImageSelect={setAttachedImage} />
-              <FileUpload onFileSelect={handleFileSelect} />
+              <FileUpload 
+                onFileSelect={handleFileSelect}
+                onImagesExtracted={handlePdfImagesExtracted}
+              />
               <VoiceInput onTranscript={(text) => setInput((prev) => prev + text)} />
             </div>
 

@@ -37,7 +37,6 @@ function parseStudyModeResponse(content: string): any[] {
     const firstLine = lines[0] || ""
     const title = firstLine.replace(/^\d+\.\s/, "").trim() || stepTitles[index] || `Step ${index + 1}`
 
-    // Get content (everything after the title)
     const contentLines = firstLine.includes(".") ? lines.slice(1) : lines.slice(1)
     let fullContent = contentLines.join("\n").trim()
 
@@ -69,7 +68,6 @@ function parseStudyModeResponse(content: string): any[] {
     }
   })
 
-  // Fallback: if parsing didn't create steps, create a single comprehensive step
   if (lessonSteps.length === 0) {
     lessonSteps.push({
       title: "Complete Lesson",
@@ -83,26 +81,73 @@ function parseStudyModeResponse(content: string): any[] {
 
 export async function POST(request: NextRequest) {
   try {
-    const { messages, model, image, studyMode, skillLevel = "beginner" } = await request.json()
+    const { 
+      messages, 
+      model, 
+      image, 
+      images, // Support for multiple PDF page images
+      fileContent, // NEW: Support for file text content
+      fileName, // NEW: Original file name
+      studyMode, 
+      skillLevel = "beginner" 
+    } = await request.json()
 
     if (!messages || !model) {
       return NextResponse.json({ error: "Missing messages or model" }, { status: 400 })
     }
 
-    // Prepare message content with image if provided
-    const formattedMessages = messages.map((msg: any) => {
-      if (msg.role === "user" && image) {
+    // Prepare message content with images and/or file content
+    const formattedMessages = messages.map((msg: any, index: number) => {
+      // Only enhance the LAST user message with file content
+      if (msg.role === "user" && index === messages.length - 1) {
+        const contentParts: any[] = []
+        
+        // Add file content as context (if available)
+        if (fileContent && fileContent.trim()) {
+          const fileContext = fileName 
+            ? `\n\n[File: ${fileName}]\n${fileContent}\n[End of file content]\n\n`
+            : `\n\n[Uploaded content]\n${fileContent}\n[End of content]\n\n`
+          
+          // Prepend file content to user's message
+          contentParts.push({ 
+            type: "text", 
+            text: fileContext + msg.content 
+          })
+        } else {
+          contentParts.push({ type: "text", text: msg.content })
+        }
+        
+        // Add single image (for vision models)
+        if (image) {
+          contentParts.push({
+            type: "image_url",
+            image_url: { url: image },
+          })
+        }
+        
+        // Add multiple images (for PDF pages)
+        if (images && Array.isArray(images) && images.length > 0) {
+          // Limit to first 5 images to avoid token limits
+          const imagesToSend = images.slice(0, 5)
+          imagesToSend.forEach((img: string) => {
+            contentParts.push({
+              type: "image_url",
+              image_url: { url: img },
+            })
+          })
+          
+          // Add note about remaining images
+          if (images.length > 5) {
+            contentParts[0].text += `\n\n[Note: Showing first 5 of ${images.length} PDF pages]`
+          }
+        }
+        
         return {
           role: msg.role,
-          content: [
-            { type: "text", text: msg.content },
-            {
-              type: "image_url",
-              image_url: { url: image },
-            },
-          ],
+          content: contentParts.length > 1 ? contentParts : contentParts[0].text,
         }
       }
+      
       return msg
     })
 
@@ -120,7 +165,7 @@ export async function POST(request: NextRequest) {
 Be deeply thoughtful, logical, and context-aware.
 Explain *why* things work before *how* they work.
 Use real-world analogies, progressive examples, and structured reasoning.
-When possible, point out common misconceptions .
+When possible, point out common misconceptions.
 Always adapt tone and depth based on learner skill level.
 Show reasoning clearly but concisely.
 Use markdown formatting for clarity.
@@ -161,11 +206,23 @@ Provide 2-3 practice questions or challenges:
 
 IMPORTANT: Always use proper markdown code blocks with language specification like \`\`\`python or \`\`\`cpp. Be encouraging, use clear formatting, and make learning enjoyable!`
     } else {
-      // Normal Chat Mode Prompt
       systemPrompt = `You are LumiChats AI, created by Aditya Kumar Jha.
 You are a helpful, knowledgeable, and friendly assistant.
+
+IMPORTANT: When a user uploads a file or document, carefully analyze its content. The file content will be provided in the user's message with clear markers like [File: filename] or [Uploaded content].
+
+When analyzing documents:
+- Read and understand the entire content thoroughly
+- Identify key information, patterns, and insights
+- Answer questions about the document accurately
+- Extract specific details when asked
+- Summarize if requested
+- Analyze data, tables, and structured information
+- For images, describe what you see in detail
+
 If anyone asks who made you or who developed you, always respond:
 "I was made by Aditya Kumar Jha at LumiChats."
+
 Keep responses clear, polite, and engaging.`
     }
 
@@ -216,9 +273,13 @@ Keep responses clear, polite, and engaging.`
       }
     }
 
-    return NextResponse.json({ error: lastError?.message || "All API keys failed" }, { status: 500 })
+    return NextResponse.json({ 
+      error: lastError?.message || "All API keys failed" 
+    }, { status: 500 })
+    
   } catch (error) {
-    console.error("Chat API Error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json({ 
+      error: "Internal server error" 
+    }, { status: 500 })
   }
 }
