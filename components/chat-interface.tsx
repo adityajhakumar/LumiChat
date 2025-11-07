@@ -41,7 +41,8 @@ export default function ChatInterface({
   const [loading, setLoading] = useState(false)
   const [attachedImage, setAttachedImage] = useState<string | null>(null)
   const [attachedFile, setAttachedFile] = useState<{ content: string; name: string } | null>(null)
-  const [pdfImages, setPdfImages] = useState<string[]>([]) // Store PDF page images
+  const [pdfImages, setPdfImages] = useState<string[]>([])
+  const [fileContentSent, setFileContentSent] = useState(false) // Track if file content was already sent
   const [codeLanguage, setCodeLanguage] = useState("python")
   const [lessonSteps, setLessonSteps] = useState<any[]>([])
   const [followUpInput, setFollowUpInput] = useState("")
@@ -65,7 +66,6 @@ export default function ChatInterface({
     }
   }, [currentStudySession])
 
-  // Improved scroll behavior - no forced smooth scrolling
   const scrollToBottom = (force = false) => {
     if (!messagesContainerRef.current || !messagesEndRef.current) return
     
@@ -73,13 +73,11 @@ export default function ChatInterface({
     const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
     
     if (force || isNearBottom) {
-      // Use instant scroll instead of smooth for better performance
       messagesEndRef.current.scrollIntoView({ behavior: "auto", block: "end" })
       setUserScrolled(false)
     }
   }
 
-  // Detect user manual scrolling
   useEffect(() => {
     const container = messagesContainerRef.current
     if (!container) return
@@ -99,16 +97,13 @@ export default function ChatInterface({
     }
   }, [userScrolled])
 
-  // Auto-scroll when new messages arrive
   useEffect(() => {
     if (messages.length > 0 && !userScrolled) {
-      // Small delay to ensure DOM is updated
       const timeoutId = setTimeout(() => scrollToBottom(true), 50)
       return () => clearTimeout(timeoutId)
     }
   }, [messages.length, userScrolled])
 
-  // --- Paste Image Support ---
   useEffect(() => {
     const handlePaste = (event: ClipboardEvent) => {
       if (!event.clipboardData) return
@@ -158,7 +153,7 @@ export default function ChatInterface({
 
   const handleFileSelect = (content: string, fileName: string) => {
     setAttachedFile({ content, name: fileName })
-    // Show a visual indicator that file is attached
+    setFileContentSent(false) // Reset when new file uploaded
     if (!input.trim()) {
       setInput("Analyze this document")
     }
@@ -166,10 +161,9 @@ export default function ChatInterface({
 
   const handlePdfImagesExtracted = (images: string[], fileName: string) => {
     setPdfImages(images)
-    // Images are stored separately for vision analysis
   }
 
-  const sendMessageToAPI = async (messagesToSend: Array<{ role: string; content: string }>) => {
+  const sendMessageToAPI = async (messagesToSend: Array<{ role: string; content: string }>, includeFileContent = false) => {
     setLoading(true)
     
     try {
@@ -180,9 +174,10 @@ export default function ChatInterface({
           messages: messagesToSend,
           model: selectedModel,
           image: attachedImage,
-          images: pdfImages.length > 0 ? pdfImages : undefined, // Send PDF images
-          fileContent: attachedFile?.content,  // Send file text content
-          fileName: attachedFile?.name,        // Send file name
+          images: pdfImages.length > 0 ? pdfImages : undefined,
+          // Only send file content when explicitly requested (first message with file)
+          fileContent: includeFileContent && attachedFile?.content ? attachedFile.content : undefined,
+          fileName: includeFileContent && attachedFile?.name ? attachedFile.name : undefined,
           studyMode: studyMode,
         }),
       })
@@ -202,6 +197,10 @@ export default function ChatInterface({
 
   const handleSendMessage = async () => {
     if (!input.trim() && !attachedImage && !attachedFile) return
+    
+    // Check if this is the first message with file content
+    const shouldIncludeFile = attachedFile !== null && !fileContentSent
+    
     const userMessage = { role: "user", content: input }
     const newMessages = [...messages, userMessage]
 
@@ -215,14 +214,18 @@ export default function ChatInterface({
 
     setInput("")
     setAttachedImage(null)
-    setAttachedFile(null)
-    setPdfImages([]) // Clear PDF images after sending
+    // Don't clear attachedFile - keep it visible but mark as sent
+    setPdfImages([])
 
-    // Force scroll after sending message
     setTimeout(() => scrollToBottom(true), 50)
 
-    const data = await sendMessageToAPI(newMessages)
+    const data = await sendMessageToAPI(newMessages, shouldIncludeFile)
     if (!data) return
+
+    // Mark file content as sent after successful first message
+    if (shouldIncludeFile) {
+      setFileContentSent(true)
+    }
 
     if (studyMode) {
       if (data.lessonSteps) {
@@ -248,7 +251,6 @@ export default function ChatInterface({
 
     onTokenCountChange(data.tokenCount || 0)
     
-    // Force scroll after receiving response
     setTimeout(() => scrollToBottom(true), 50)
   }
 
@@ -272,7 +274,7 @@ export default function ChatInterface({
     setEditingMessageIndex(null)
     setEditedContent("")
     
-    const data = await sendMessageToAPI(messagesToKeep)
+    const data = await sendMessageToAPI(messagesToKeep, false) // Don't include file on edits
     if (!data) return
     
     const assistantMessage = { 
@@ -294,7 +296,7 @@ export default function ChatInterface({
     const messagesToKeep = messages.slice(0, index)
     onMessagesChange(messagesToKeep)
     
-    const data = await sendMessageToAPI(messagesToKeep)
+    const data = await sendMessageToAPI(messagesToKeep, false) // Don't include file on regenerate
     if (!data) return
     
     const assistantMessage = { 
@@ -307,7 +309,6 @@ export default function ChatInterface({
     setTimeout(() => scrollToBottom(true), 50)
   }
 
-  // Handler for threaded responses
   const handleThreadResponse = async (parentText: string, userMessage: string): Promise<string> => {
     try {
       const threadMessages = [
@@ -350,7 +351,7 @@ export default function ChatInterface({
     const newMessages = [...messages, userMessage]
     setFollowUpInput("")
 
-    const data = await sendMessageToAPI(newMessages)
+    const data = await sendMessageToAPI(newMessages, false) // Don't include file for follow-ups
     if (!data) return
 
     if (data.lessonSteps) {
@@ -379,7 +380,7 @@ Provide constructive feedback and suggestions for improvement.`
     const newMessages = [...messages, userMessage]
     setFollowUpInput("")
 
-    const data = await sendMessageToAPI(newMessages)
+    const data = await sendMessageToAPI(newMessages, false) // Don't include file for code feedback
     if (!data) return
 
     if (data.lessonSteps) {
@@ -418,7 +419,7 @@ Format as JSON with this structure:
     const userMessage = { role: "user", content: quizPrompt }
     const newMessages = [...messages, userMessage]
 
-    const data = await sendMessageToAPI(newMessages)
+    const data = await sendMessageToAPI(newMessages, false) // Don't include file for quiz generation
     if (!data) return
 
     try {
@@ -457,7 +458,6 @@ Format as JSON with this structure:
   if (studyMode) {
     return (
       <div ref={containerRef} className="flex h-full bg-[#1E1E1E] text-white overflow-hidden">
-        {/* Left side - Lessons or Quiz */}
         <div style={{ width: `${dividerPos}%` }} className="flex flex-col overflow-hidden border-r border-[#2E2E2E]">
           {quizMode && quizData ? (
             <QuizMode quizData={quizData} onComplete={handleQuizComplete} topic={currentTopic} />
@@ -489,7 +489,6 @@ Format as JSON with this structure:
             </>
           ) : (
             <>
-              {/* Initial prompt area */}
               <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-2">
                 <div className="flex items-center justify-center h-full text-center px-4">
                   <div>
@@ -501,7 +500,6 @@ Format as JSON with this structure:
                 </div>
               </div>
 
-              {/* Input for initial question */}
               <div className="border-t border-[#2E2E2E] bg-[#171717] p-3 md:p-6 flex-shrink-0">
                 <div className="flex flex-col md:flex-row gap-2 md:gap-3">
                   <div className="flex-1">
@@ -528,7 +526,6 @@ Format as JSON with this structure:
           )}
         </div>
 
-        {/* Divider */}
         <div
           onMouseDown={() => setIsDragging(true)}
           className="w-1 bg-[#2E2E2E] hover:bg-[#CC785C] cursor-col-resize transition-colors flex items-center justify-center group"
@@ -539,7 +536,6 @@ Format as JSON with this structure:
           />
         </div>
 
-        {/* Right side - Code Editor */}
         <div style={{ width: `${100 - dividerPos}%` }} className="flex flex-col overflow-hidden">
           <CodeEditor
             language={codeLanguage}
@@ -554,7 +550,6 @@ Format as JSON with this structure:
 
   return (
     <div className="flex flex-col h-full bg-[#1E1E1E] text-white overflow-hidden">
-      {/* Messages */}
       <div 
         ref={messagesContainerRef}
         className="flex-1 overflow-y-auto"
@@ -622,7 +617,6 @@ Format as JSON with this structure:
         </div>
       </div>
 
-      {/* Scroll to Bottom Button - Shows when user scrolled up */}
       {userScrolled && (
         <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 z-10">
           <button
@@ -635,10 +629,8 @@ Format as JSON with this structure:
         </div>
       )}
 
-      {/* Input - Claude Style - Mobile Optimized */}
       <div className="bg-[#1E1E1E] px-3 sm:px-4 pb-4 sm:pb-6 pt-3 sm:pt-4 flex-shrink-0">
         <div className="max-w-3xl mx-auto">
-          {/* Model Selector - Mobile Only */}
           <div className="sm:hidden mb-3">
             <ModelSelector 
               selectedModel={selectedModel} 
@@ -647,7 +639,6 @@ Format as JSON with this structure:
             />
           </div>
 
-          {/* Attached Files Preview */}
           {attachedImage && (
             <div className="mb-2 sm:mb-3 relative inline-block">
               <img
@@ -672,12 +663,16 @@ Format as JSON with this structure:
                   {pdfImages.length > 0 && (
                     <span className="text-xs text-[#6B6B65]">{pdfImages.length} pages extracted</span>
                   )}
+                  {fileContentSent && (
+                    <span className="text-xs text-green-500">✓ Context maintained</span>
+                  )}
                 </div>
               </div>
               <button
                 onClick={() => {
                   setAttachedFile(null)
                   setPdfImages([])
+                  setFileContentSent(false)
                 }}
                 className="ml-2 text-[#6B6B65] hover:text-[#D65D5D] transition flex-shrink-0"
               >
@@ -686,9 +681,7 @@ Format as JSON with this structure:
             </div>
           )}
           
-          {/* Input Container - Mobile Optimized */}
           <div className="relative bg-[#2A2A2A] rounded-2xl sm:rounded-3xl border border-[#3A3A3A] focus-within:border-[#4A4A4A] transition-colors shadow-lg">
-            {/* Attachment buttons - LEFT Side */}
             <div className="absolute left-3 sm:left-4 bottom-[14px] sm:bottom-4 flex items-center gap-1 z-10">
               <ImageUpload onImageSelect={setAttachedImage} />
               <FileUpload 
@@ -709,9 +702,7 @@ Format as JSON with this structure:
               style={{ minHeight: '56px', maxHeight: '200px' }}
             />
             
-            {/* Model Selector + Send Button - RIGHT Side */}
             <div className="absolute right-3 sm:right-4 bottom-[14px] sm:bottom-4 flex items-center gap-2">
-              {/* Model Selector - Desktop */}
               <div className="hidden sm:block">
                 <ModelSelector 
                   selectedModel={selectedModel} 
@@ -720,7 +711,6 @@ Format as JSON with this structure:
                 />
               </div>
               
-              {/* Send Button */}
               <button
                 onClick={handleSendMessage}
                 disabled={loading || (!input.trim() && !attachedImage && !attachedFile)}

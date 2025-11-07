@@ -85,9 +85,9 @@ export async function POST(request: NextRequest) {
       messages, 
       model, 
       image, 
-      images, // Support for multiple PDF page images
-      fileContent, // NEW: Support for file text content
-      fileName, // NEW: Original file name
+      images,
+      fileContent, 
+      fileName,
       studyMode, 
       skillLevel = "beginner" 
     } = await request.json()
@@ -96,50 +96,54 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Missing messages or model" }, { status: 400 })
     }
 
-    // Prepare message content with images and/or file content
+    // FIXED: Add file content to system prompt or first user message
+    // This ensures context is maintained throughout the conversation
     const formattedMessages = messages.map((msg: any, index: number) => {
-      // Only enhance the LAST user message with file content
-      if (msg.role === "user" && index === messages.length - 1) {
+      if (msg.role === "user") {
         const contentParts: any[] = []
         
-        // Add file content as context (if available)
-        if (fileContent && fileContent.trim()) {
-          const fileContext = fileName 
-            ? `\n\n[File: ${fileName}]\n${fileContent}\n[End of file content]\n\n`
-            : `\n\n[Uploaded content]\n${fileContent}\n[End of content]\n\n`
+        // For the FIRST user message after file upload, include file content
+        // For subsequent messages, the file context is already in conversation history
+        if (index === messages.length - 1) {
+          // Last message - add new images/file if provided
+          if (fileContent && fileContent.trim()) {
+            const fileContext = fileName 
+              ? `\n\n[File: ${fileName}]\n${fileContent}\n[End of file content]\n\n`
+              : `\n\n[Uploaded content]\n${fileContent}\n[End of content]\n\n`
+            
+            contentParts.push({ 
+              type: "text", 
+              text: fileContext + msg.content 
+            })
+          } else {
+            contentParts.push({ type: "text", text: msg.content })
+          }
           
-          // Prepend file content to user's message
-          contentParts.push({ 
-            type: "text", 
-            text: fileContext + msg.content 
-          })
-        } else {
-          contentParts.push({ type: "text", text: msg.content })
-        }
-        
-        // Add single image (for vision models)
-        if (image) {
-          contentParts.push({
-            type: "image_url",
-            image_url: { url: image },
-          })
-        }
-        
-        // Add multiple images (for PDF pages)
-        if (images && Array.isArray(images) && images.length > 0) {
-          // Limit to first 5 images to avoid token limits
-          const imagesToSend = images.slice(0, 5)
-          imagesToSend.forEach((img: string) => {
+          // Add single image
+          if (image) {
             contentParts.push({
               type: "image_url",
-              image_url: { url: img },
+              image_url: { url: image },
             })
-          })
-          
-          // Add note about remaining images
-          if (images.length > 5) {
-            contentParts[0].text += `\n\n[Note: Showing first 5 of ${images.length} PDF pages]`
           }
+          
+          // Add multiple images (for PDF pages)
+          if (images && Array.isArray(images) && images.length > 0) {
+            const imagesToSend = images.slice(0, 5)
+            imagesToSend.forEach((img: string) => {
+              contentParts.push({
+                type: "image_url",
+                image_url: { url: img },
+              })
+            })
+            
+            if (images.length > 5) {
+              contentParts[0].text += `\n\n[Note: Showing first 5 of ${images.length} PDF pages]`
+            }
+          }
+        } else {
+          // Previous messages - keep as is
+          contentParts.push({ type: "text", text: msg.content })
         }
         
         return {
@@ -209,12 +213,17 @@ IMPORTANT: Always use proper markdown code blocks with language specification li
       systemPrompt = `You are LumiChats AI, created by Aditya Kumar Jha.
 You are a helpful, knowledgeable, and friendly assistant.
 
-IMPORTANT: When a user uploads a file or document, carefully analyze its content. The file content will be provided in the user's message with clear markers like [File: filename] or [Uploaded content].
+CRITICAL: When analyzing uploaded files or documents:
+- The file content is included in the user's messages with markers like [File: filename]
+- The file content persists throughout the ENTIRE conversation
+- You have access to ALL previous messages, including the original file upload
+- Always reference the file context from earlier messages when answering follow-up questions
+- Maintain awareness of the file's content across multiple turns of conversation
 
 When analyzing documents:
 - Read and understand the entire content thoroughly
 - Identify key information, patterns, and insights
-- Answer questions about the document accurately
+- Answer questions about the document accurately based on previous context
 - Extract specific details when asked
 - Summarize if requested
 - Analyze data, tables, and structured information

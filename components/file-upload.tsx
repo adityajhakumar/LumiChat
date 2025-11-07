@@ -5,6 +5,7 @@ interface FileUploadProps {
   onFileSelect: (content: string, fileName: string) => void
   onImagesExtracted?: (images: string[], fileName: string) => void
   onPdfImageSelect?: (images: string[]) => void
+  maxPdfPages?: number // Optional limit, defaults to unlimited
 }
 
 declare global {
@@ -13,7 +14,7 @@ declare global {
   }
 }
 
-export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImageSelect }: FileUploadProps) {
+export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImageSelect, maxPdfPages }: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -68,7 +69,7 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
       script.onerror = () => {
         if (retryCount < maxRetries - 1) {
           retryCount++
-          setTimeout(loadPdfJs, 1000 * retryCount) // Exponential backoff
+          setTimeout(loadPdfJs, 1000 * retryCount)
         } else {
           setPdfJsError(true)
         }
@@ -149,10 +150,9 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
     const images: string[] = []
 
     try {
-      // Load PDF with error handling
       const loadingTask = window.pdfjsLib.getDocument({ 
         data: arrayBuffer,
-        verbosity: 0 // Suppress console warnings
+        verbosity: 0
       })
       
       pdf = await loadingTask.promise
@@ -162,10 +162,11 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
         throw new Error('PDF has no pages')
       }
 
-      const pagesToProcess = Math.min(numPages, 20)
+      // Apply page limit if specified, otherwise process all pages
+      const pagesToProcess = maxPdfPages ? Math.min(numPages, maxPdfPages) : numPages
       
-      if (numPages > 20) {
-        setProcessingStatus(`Converting first 20 of ${numPages} pages...`)
+      if (maxPdfPages && numPages > maxPdfPages) {
+        setProcessingStatus(`Converting first ${maxPdfPages} of ${numPages} pages...`)
       } else {
         setProcessingStatus(`Converting ${numPages} pages...`)
       }
@@ -196,11 +197,9 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
           const imageData = canvas.toDataURL('image/jpeg', 0.85)
           images.push(imageData)
           
-          // Cleanup
           page.cleanup()
         } catch (pageErr) {
           console.warn(`Error processing page ${pageNum}:`, pageErr)
-          // Continue with other pages
         }
       }
 
@@ -210,7 +209,6 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
     } catch (err) {
       throw new Error(`PDF conversion failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {
-      // Cleanup PDF document
       if (pdf) {
         try {
           pdf.destroy()
@@ -235,16 +233,19 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
       })
       
       pdf = await loadingTask.promise
-      const numPages = Math.min(pdf.numPages, 20)
+      
+      // Apply page limit if specified, otherwise process all pages
+      const numPages = maxPdfPages ? Math.min(pdf.numPages, maxPdfPages) : pdf.numPages
       let fullText = ''
 
       for (let pageNum = 1; pageNum <= numPages; pageNum++) {
         try {
+          setProcessingStatus(`Extracting text from page ${pageNum}/${numPages}...`)
+          
           const page = await pdf.getPage(pageNum)
           const textContent = await page.getTextContent()
           
           if (!textContent?.items || textContent.items.length === 0) {
-            // Silent skip - page may be image-based
             page.cleanup()
             continue
           }
@@ -283,7 +284,6 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
           
           fullText += `--- Page ${pageNum} ---\n${pageText}\n\n`
           
-          // Cleanup
           page.cleanup()
           
         } catch (pageErr) {
@@ -312,7 +312,7 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
         .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '')
         .replace(/\r\n/g, '\n')
         .replace(/\r/g, '\n')
-        .replace(/\n{3,}/g, '\n\n') // Remove excessive newlines
+        .replace(/\n{3,}/g, '\n\n')
         .trim()
     } catch (err) {
       return text
@@ -351,7 +351,6 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
       }
     }
 
-    // Special check for PDF files
     if (fileExtension === 'pdf' && pdfJsError) {
       return { 
         valid: false, 
@@ -363,7 +362,6 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
   }
 
   const processFile = async (file: File) => {
-    // Cancel any ongoing processing
     if (abortControllerRef.current) {
       abortControllerRef.current.abort()
     }
@@ -375,7 +373,6 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
     setIsProcessing(true)
     setProcessingStatus("")
 
-    // Validate file
     const validation = validateFile(file)
     if (!validation.valid) {
       showError(validation.error || 'Invalid file')
@@ -389,7 +386,6 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
     try {
       let content = ""
 
-      // Handle DOCX and XLSX via server-side API
       if (['docx', 'doc', 'xlsx', 'xls'].includes(fileExtension)) {
         setProcessingStatus("Processing document...")
         
@@ -423,7 +419,6 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
           throw new Error(`Failed to process ${fileExtension.toUpperCase()}: ${fetchErr instanceof Error ? fetchErr.message : 'Server unavailable'}`)
         }
       }
-      // Handle PDF - Convert to images AND extract text
       else if (fileExtension === 'pdf') {
         if (!pdfJsLoaded) {
           throw new Error('PDF library is still loading. Please wait a moment and try again.')
@@ -442,7 +437,6 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
         let extractedText = ""
         let images: string[] = []
 
-        // Try text extraction
         try {
           const textBuffer = originalBuffer.slice(0)
           setProcessingStatus("Extracting text from PDF...")
@@ -451,7 +445,6 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
           // Continue to image conversion silently
         }
 
-        // Try image conversion
         try {
           const imageBuffer = originalBuffer.slice(0)
           images = await convertPDFPagesToImages(imageBuffer)
@@ -461,29 +454,24 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
           }
         }
 
-        // Determine content strategy
         const textLength = extractedText.replace(/\s/g, '').length
         const hasImages = images.length > 0
         
         if (textLength < 100 && hasImages) {
-          // Image-based or scanned PDF - prioritize visual analysis
           content = `[PDF: ${file.name} - ${images.length} pages converted to images for visual analysis]\n\n${extractedText ? 'Minimal text extracted:\n' + extractedText : ''}`
           
           if (onPdfImageSelect) onPdfImageSelect(images)
           if (onImagesExtracted) onImagesExtracted(images, file.name)
           
         } else if (textLength >= 100) {
-          // Text-based PDF with good content
           content = extractedText
           
-          // Still provide images for tables, charts, diagrams
           if (hasImages) {
             if (onPdfImageSelect) onPdfImageSelect(images)
             if (onImagesExtracted) onImagesExtracted(images, file.name)
           }
           
         } else if (hasImages) {
-          // Has images but no text
           content = `[PDF: ${file.name} - ${images.length} pages converted to images for visual analysis]`
           if (onPdfImageSelect) onPdfImageSelect(images)
           if (onImagesExtracted) onImagesExtracted(images, file.name)
@@ -492,7 +480,6 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
           throw new Error('PDF appears to be empty or unreadable')
         }
       }
-      // Handle text files client-side
       else {
         try {
           content = await file.text()
@@ -507,11 +494,9 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
         throw new Error("File is empty or contains no readable text")
       }
 
-      // Success!
       onFileSelect(sanitizedContent, file.name)
       showSuccess()
 
-      // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = ""
       }
