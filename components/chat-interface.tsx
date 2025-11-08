@@ -27,6 +27,37 @@ interface ChatInterfaceProps {
   currentStudySession?: any
 }
 
+// Fallback configuration
+const MODEL_FALLBACK_CONFIG = {
+  fallbackChains: {
+    "google/gemini-2.0-flash-exp:free": [
+      "qwen/qwen2.5-vl-32b-instruct:free",
+      "nvidia/nemotron-nano-12b-v2-vl:free",
+      "google/gemma-3-27b-it:free"
+    ],
+    "qwen/qwen2.5-vl-32b-instruct:free": [
+      "google/gemini-2.0-flash-exp:free",
+      "nvidia/nemotron-nano-12b-v2-vl:free"
+    ],
+    "deepseek/deepseek-r1-distill-llama-70b:free": [
+      "tngtech/deepseek-r1t2-chimera:free",
+      "meta-llama/llama-3.3-70b-instruct:free"
+    ],
+    "qwen/qwen3-coder:free": [
+      "mistralai/devstral-small-2505:free",
+      "meta-llama/llama-3.3-70b-instruct:free"
+    ]
+  },
+  universalFallbacks: [
+    "meta-llama/llama-3.3-70b-instruct:free",
+    "google/gemini-2.0-flash-exp:free",
+    "google/gemma-3-27b-it:free",
+    "qwen/qwen3-14b:free"
+  ],
+  maxRetries: 3,
+  retryDelay: 500
+};
+
 export default function ChatInterface({
   selectedModel,
   onModelChange,
@@ -42,7 +73,7 @@ export default function ChatInterface({
   const [attachedImage, setAttachedImage] = useState<string | null>(null)
   const [attachedFile, setAttachedFile] = useState<{ content: string; name: string } | null>(null)
   const [pdfImages, setPdfImages] = useState<string[]>([])
-  const [fileContentSent, setFileContentSent] = useState(false) // Track if file content was already sent
+  const [fileContentSent, setFileContentSent] = useState(false)
   const [codeLanguage, setCodeLanguage] = useState("python")
   const [lessonSteps, setLessonSteps] = useState<any[]>([])
   const [followUpInput, setFollowUpInput] = useState("")
@@ -54,6 +85,21 @@ export default function ChatInterface({
   const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null)
   const [editedContent, setEditedContent] = useState("")
   const [userScrolled, setUserScrolled] = useState(false)
+  
+  // Fallback states
+  const [fallbackInfo, setFallbackInfo] = useState<{
+    originalModel: string;
+    usedModel: string;
+    attempts: number;
+  } | null>(null);
+
+  const [retryStatus, setRetryStatus] = useState<{
+    show: boolean;
+    currentModel: string;
+    attemptNumber: number;
+    totalAttempts: number;
+  }>({ show: false, currentModel: '', attemptNumber: 0, totalAttempts: 0 });
+
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -153,7 +199,7 @@ export default function ChatInterface({
 
   const handleFileSelect = (content: string, fileName: string) => {
     setAttachedFile({ content, name: fileName })
-    setFileContentSent(false) // Reset when new file uploaded
+    setFileContentSent(false)
     if (!input.trim()) {
       setInput("Analyze this document")
     }
@@ -163,44 +209,97 @@ export default function ChatInterface({
     setPdfImages(images)
   }
 
-  const sendMessageToAPI = async (messagesToSend: Array<{ role: string; content: string }>, includeFileContent = false) => {
-    setLoading(true)
+  // Enhanced API call with fallback mechanism
+  const sendMessageToAPIWithFallback = async (
+    messagesToSend: Array<{ role: string; content: string }>,
+    includeFileContent = false,
+    primaryModel: string
+  ) => {
+    const fallbackChain = MODEL_FALLBACK_CONFIG.fallbackChains[primaryModel] 
+      || MODEL_FALLBACK_CONFIG.universalFallbacks;
     
-    try {
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          messages: messagesToSend,
-          model: selectedModel,
-          image: attachedImage,
-          images: pdfImages.length > 0 ? pdfImages : undefined,
-          // Only send file content when explicitly requested (first message with file)
-          fileContent: includeFileContent && attachedFile?.content ? attachedFile.content : undefined,
-          fileName: includeFileContent && attachedFile?.name ? attachedFile.name : undefined,
-          studyMode: studyMode,
-        }),
-      })
-      const data = await response.json()
-      if (data.error) {
-        console.error(data.error)
-        return null
+    const modelsToTry = [primaryModel, ...fallbackChain]
+      .slice(0, MODEL_FALLBACK_CONFIG.maxRetries + 1);
+    
+    const failedAttempts: Array<{ model: string; error: string }> = [];
+    
+    for (let i = 0; i < modelsToTry.length; i++) {
+      const currentModel = modelsToTry[i];
+      const isPrimary = i === 0;
+      
+      try {
+        if (!isPrimary) {
+          setRetryStatus({
+            show: true,
+            currentModel: currentModel,
+            attemptNumber: i,
+            totalAttempts: modelsToTry.length - 1
+          });
+          
+          await new Promise(resolve => setTimeout(resolve, MODEL_FALLBACK_CONFIG.retryDelay));
+        }
+        
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: messagesToSend,
+            model: currentModel,
+            image: attachedImage,
+            images: pdfImages.length > 0 ? pdfImages : undefined,
+            fileContent: includeFileContent && attachedFile?.content ? attachedFile.content : undefined,
+            fileName: includeFileContent && attachedFile?.name ? attachedFile.name : undefined,
+            studyMode: studyMode,
+          }),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        
+        if (!data.content || data.content.trim() === '') {
+          throw new Error('Empty response received');
+        }
+        
+        setRetryStatus({ show: false, currentModel: '', attemptNumber: 0, totalAttempts: 0 });
+        
+        return {
+          data,
+          usedModel: currentModel,
+          fallbackUsed: !isPrimary,
+          totalAttempts: i + 1
+        };
+        
+      } catch (err: any) {
+        const errorMsg = err.message || 'Unknown error';
+        console.error(`❌ Model ${currentModel} failed:`, errorMsg);
+        
+        failedAttempts.push({
+          model: currentModel,
+          error: errorMsg
+        });
+        
+        if (i === modelsToTry.length - 1) {
+          setRetryStatus({ show: false, currentModel: '', attemptNumber: 0, totalAttempts: 0 });
+          console.error('💥 All models exhausted. Failed attempts:', failedAttempts);
+          return null;
+        }
       }
-      return data
-    } catch (err) {
-      console.error(err)
-      return null
-    } finally {
-      setLoading(false)
     }
-  }
+    
+    return null;
+  };
 
   const handleSendMessage = async () => {
     if (!input.trim() && !attachedImage && !attachedFile) return
     
-    // Check if this is the first message with file content
     const shouldIncludeFile = attachedFile !== null && !fileContentSent
-    
     const userMessage = { role: "user", content: input }
     const newMessages = [...messages, userMessage]
 
@@ -214,17 +313,53 @@ export default function ChatInterface({
 
     setInput("")
     setAttachedImage(null)
-    // Don't clear attachedFile - keep it visible but mark as sent
     setPdfImages([])
+    setFallbackInfo(null)
 
     setTimeout(() => scrollToBottom(true), 50)
+    setLoading(true)
 
-    const data = await sendMessageToAPI(newMessages, shouldIncludeFile)
-    if (!data) return
+    const result = await sendMessageToAPIWithFallback(
+      newMessages,
+      shouldIncludeFile,
+      selectedModel
+    )
 
-    // Mark file content as sent after successful first message
+    setLoading(false)
+
+    if (!result) {
+      const errorMessage = {
+        role: "assistant",
+        content: `❌ **Unable to Generate Response**\n\n` +
+          `All available models failed to respond. This might be due to:\n\n` +
+          `• Network connectivity issues\n` +
+          `• API rate limits or service unavailability\n` +
+          `• Content policy restrictions\n\n` +
+          `**What you can try:**\n` +
+          `1. Check your internet connection\n` +
+          `2. Wait a moment and try again\n` +
+          `3. Try a different model from the selector\n` +
+          `4. Simplify or rephrase your message\n\n` +
+          `If the problem persists, the service may be temporarily unavailable.`
+      }
+      onMessagesChange([...newMessages, errorMessage])
+      return
+    }
+
+    const { data, usedModel, fallbackUsed, totalAttempts } = result
+
     if (shouldIncludeFile) {
       setFileContentSent(true)
+    }
+
+    if (fallbackUsed) {
+      setFallbackInfo({
+        originalModel: selectedModel,
+        usedModel: usedModel,
+        attempts: totalAttempts - 1
+      })
+      
+      setTimeout(() => setFallbackInfo(null), 6000)
     }
 
     if (studyMode) {
@@ -234,7 +369,7 @@ export default function ChatInterface({
           id: Date.now().toString(),
           question: currentTopic || input,
           lessonSteps: data.lessonSteps,
-          model: selectedModel,
+          model: usedModel,
           timestamp: Date.now(),
         }
         const saved = localStorage.getItem("mmchat_study_sessions")
@@ -250,7 +385,6 @@ export default function ChatInterface({
     }
 
     onTokenCountChange(data.tokenCount || 0)
-    
     setTimeout(() => scrollToBottom(true), 50)
   }
 
@@ -273,16 +407,19 @@ export default function ChatInterface({
     
     setEditingMessageIndex(null)
     setEditedContent("")
+    setLoading(true)
     
-    const data = await sendMessageToAPI(messagesToKeep, false) // Don't include file on edits
-    if (!data) return
+    const result = await sendMessageToAPIWithFallback(messagesToKeep, false, selectedModel)
+    setLoading(false)
+    
+    if (!result) return
     
     const assistantMessage = { 
       role: "assistant", 
-      content: data.content
+      content: result.data.content
     }
     onMessagesChange([...messagesToKeep, assistantMessage])
-    onTokenCountChange(data.tokenCount || 0)
+    onTokenCountChange(result.data.tokenCount || 0)
     
     setTimeout(() => scrollToBottom(true), 50)
   }
@@ -295,16 +432,19 @@ export default function ChatInterface({
   const handleRegenerateResponse = async (index: number) => {
     const messagesToKeep = messages.slice(0, index)
     onMessagesChange(messagesToKeep)
+    setLoading(true)
     
-    const data = await sendMessageToAPI(messagesToKeep, false) // Don't include file on regenerate
-    if (!data) return
+    const result = await sendMessageToAPIWithFallback(messagesToKeep, false, selectedModel)
+    setLoading(false)
+    
+    if (!result) return
     
     const assistantMessage = { 
       role: "assistant", 
-      content: data.content
+      content: result.data.content
     }
     onMessagesChange([...messagesToKeep, assistantMessage])
-    onTokenCountChange(data.tokenCount || 0)
+    onTokenCountChange(result.data.tokenCount || 0)
     
     setTimeout(() => scrollToBottom(true), 50)
   }
@@ -350,14 +490,17 @@ export default function ChatInterface({
     const userMessage = { role: "user", content: followUpInput }
     const newMessages = [...messages, userMessage]
     setFollowUpInput("")
+    setLoading(true)
 
-    const data = await sendMessageToAPI(newMessages, false) // Don't include file for follow-ups
-    if (!data) return
+    const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel)
+    setLoading(false)
+    
+    if (!result) return
 
-    if (data.lessonSteps) {
-      setLessonSteps(data.lessonSteps)
+    if (result.data.lessonSteps) {
+      setLessonSteps(result.data.lessonSteps)
     }
-    onTokenCountChange(data.tokenCount || 0)
+    onTokenCountChange(result.data.tokenCount || 0)
   }
 
   const handleCodeFeedback = async (code: string) => {
@@ -379,14 +522,17 @@ Provide constructive feedback and suggestions for improvement.`
     const userMessage = { role: "user", content: feedbackPrompt }
     const newMessages = [...messages, userMessage]
     setFollowUpInput("")
+    setLoading(true)
 
-    const data = await sendMessageToAPI(newMessages, false) // Don't include file for code feedback
-    if (!data) return
+    const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel)
+    setLoading(false)
+    
+    if (!result) return
 
-    if (data.lessonSteps) {
-      setLessonSteps(data.lessonSteps)
+    if (result.data.lessonSteps) {
+      setLessonSteps(result.data.lessonSteps)
     }
-    onTokenCountChange(data.tokenCount || 0)
+    onTokenCountChange(result.data.tokenCount || 0)
   }
 
   const handleStartQuiz = async (numQuestions: number) => {
@@ -418,12 +564,15 @@ Format as JSON with this structure:
 
     const userMessage = { role: "user", content: quizPrompt }
     const newMessages = [...messages, userMessage]
+    setLoading(true)
 
-    const data = await sendMessageToAPI(newMessages, false) // Don't include file for quiz generation
-    if (!data) return
+    const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel)
+    setLoading(false)
+    
+    if (!result) return
 
     try {
-      const jsonMatch = data.content.match(/\{[\s\S]*\}/)
+      const jsonMatch = result.data.content.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
         const parsedQuiz = JSON.parse(jsonMatch[0])
         setQuizData(parsedQuiz)
@@ -433,7 +582,7 @@ Format as JSON with this structure:
       console.error("Failed to parse quiz data:", e)
     }
 
-    onTokenCountChange(data.tokenCount || 0)
+    onTokenCountChange(result.data.tokenCount || 0)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -458,6 +607,74 @@ Format as JSON with this structure:
   if (studyMode) {
     return (
       <div ref={containerRef} className="flex h-full bg-[#1E1E1E] text-white overflow-hidden">
+        {/* Retry Status Toast */}
+        {retryStatus.show && (
+          <div className="fixed top-20 right-4 bg-[#2A2A2A] border border-yellow-600/50 rounded-lg p-3 shadow-xl z-50 max-w-xs animate-in slide-in-from-right duration-200">
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0">
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-yellow-500 border-t-transparent"></div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-yellow-400">
+                  Retrying... ({retryStatus.attemptNumber}/{retryStatus.totalAttempts})
+                </p>
+                <p className="text-xs text-[#9B9B95] truncate mt-0.5">
+                  Trying: {retryStatus.currentModel.split('/').pop()?.replace(':free', '')}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Fallback Success Notification */}
+        {fallbackInfo && (
+          <div className="fixed top-20 right-4 bg-[#2A2A2A] border border-[#CC785C] rounded-lg p-4 shadow-xl z-50 max-w-sm animate-in slide-in-from-right duration-300">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#CC785C]/20 flex items-center justify-center">
+                <svg className="w-5 h-5 text-[#CC785C]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h4 className="text-sm font-semibold text-[#E5E5E0] mb-1 flex items-center gap-2">
+                  <span>✓</span> Auto-Fallback Success
+                </h4>
+                <p className="text-xs text-[#9B9B95] mb-2">
+                  Primary model unavailable. Automatically switched to working alternative.
+                </p>
+                <div className="text-xs space-y-1.5 bg-[#1E1E1E] rounded p-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#6B6B65] w-16">Original:</span>
+                    <span className="text-red-400 font-mono text-[10px] truncate flex-1">
+                      {fallbackInfo.originalModel.split('/').pop()?.replace(':free', '')}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#6B6B65] w-16">Using:</span>
+                    <span className="text-green-400 font-mono text-[10px] truncate flex-1">
+                      {fallbackInfo.usedModel.split('/').pop()?.replace(':free', '')}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1 border-t border-[#3A3A3A]">
+                    <span className="text-[#6B6B65]">
+                      Failed attempts: {fallbackInfo.attempts}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setFallbackInfo(null)}
+                className="flex-shrink-0 text-[#6B6B65] hover:text-[#E5E5E0] transition-colors p-1"
+                title="Dismiss"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+
         <div style={{ width: `${dividerPos}%` }} className="flex flex-col overflow-hidden border-r border-[#2E2E2E]">
           {quizMode && quizData ? (
             <QuizMode quizData={quizData} onComplete={handleQuizComplete} topic={currentTopic} />
@@ -550,6 +767,74 @@ Format as JSON with this structure:
 
   return (
     <div className="flex flex-col h-full bg-[#1E1E1E] text-white overflow-hidden">
+      {/* Retry Status Toast */}
+      {retryStatus.show && (
+        <div className="fixed top-20 right-4 bg-[#2A2A2A] border border-yellow-600/50 rounded-lg p-3 shadow-xl z-50 max-w-xs animate-in slide-in-from-right duration-200">
+          <div className="flex items-center gap-3">
+            <div className="flex-shrink-0">
+              <div className="animate-spin rounded-full h-5 w-5 border-2 border-yellow-500 border-t-transparent"></div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-yellow-400">
+                Retrying... ({retryStatus.attemptNumber}/{retryStatus.totalAttempts})
+              </p>
+              <p className="text-xs text-[#9B9B95] truncate mt-0.5">
+                Trying: {retryStatus.currentModel.split('/').pop()?.replace(':free', '')}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Fallback Success Notification */}
+      {fallbackInfo && (
+        <div className="fixed top-20 right-4 bg-[#2A2A2A] border border-[#CC785C] rounded-lg p-4 shadow-xl z-50 max-w-sm animate-in slide-in-from-right duration-300">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#CC785C]/20 flex items-center justify-center">
+              <svg className="w-5 h-5 text-[#CC785C]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h4 className="text-sm font-semibold text-[#E5E5E0] mb-1 flex items-center gap-2">
+                <span>✓</span> Auto-Fallback Success
+              </h4>
+              <p className="text-xs text-[#9B9B95] mb-2">
+                Primary model unavailable. Automatically switched to working alternative.
+              </p>
+              <div className="text-xs space-y-1.5 bg-[#1E1E1E] rounded p-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-[#6B6B65] w-16">Original:</span>
+                  <span className="text-red-400 font-mono text-[10px] truncate flex-1">
+                    {fallbackInfo.originalModel.split('/').pop()?.replace(':free', '')}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[#6B6B65] w-16">Using:</span>
+                  <span className="text-green-400 font-mono text-[10px] truncate flex-1">
+                    {fallbackInfo.usedModel.split('/').pop()?.replace(':free', '')}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 pt-1 border-t border-[#3A3A3A]">
+                  <span className="text-[#6B6B65]">
+                    Failed attempts: {fallbackInfo.attempts}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => setFallbackInfo(null)}
+              className="flex-shrink-0 text-[#6B6B65] hover:text-[#E5E5E0] transition-colors p-1"
+              title="Dismiss"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
       <div 
         ref={messagesContainerRef}
         className="flex-1 overflow-y-auto"
