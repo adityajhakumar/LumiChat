@@ -48,14 +48,14 @@ export default function LumiChatsLanding({ onEnterApp }: LumiChatsLandingProps) 
               {/* Logo */}
               <img 
                 src="/generated-image (1).png" 
-                alt="LumiChats Logo" 
+                alt="AI Orchestra Logo" 
                 className="w-8 h-8 object-contain"
               />
-              <span className="text-xl font-serif">LumiChats</span>
+              <span className="text-xl font-serif">AI Orchestra</span>
             </div>
             
             <div className="hidden md:flex items-center space-x-8">
-              <a href="#why" className="text-zinc-400 hover:text-white transition-colors duration-300">Why LumiChats</a>
+              <a href="#why" className="text-zinc-400 hover:text-white transition-colors duration-300">Why Us</a>
               <a href="#pricing" className="text-zinc-400 hover:text-white transition-colors duration-300">Pricing</a>
               <a href="#features" className="text-zinc-400 hover:text-white transition-colors duration-300">Features</a>
             </div>
@@ -82,19 +82,19 @@ export default function LumiChatsLanding({ onEnterApp }: LumiChatsLandingProps) 
           >
             <div className="inline-flex items-center space-x-2 mb-8 px-4 py-2 bg-zinc-900/50 border border-zinc-800 rounded-full backdrop-blur-sm animate-fade-in">
               <div className="w-2 h-2 bg-orange-500 rounded-full animate-pulse" />
-              <span className="text-zinc-400 text-sm">Stop paying for unused subscriptions</span>
+              <span className="text-zinc-400 text-sm">Power Meets Flexibility</span>
             </div>
             
             <h1 className="text-5xl sm:text-6xl lg:text-7xl font-serif mb-8 leading-tight tracking-tight">
-              <span className="block mb-2 animate-fade-in-up">Every AI model,</span>
+              <span className="block mb-2 animate-fade-in-up">AI Orchestra</span>
               <span className="block bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600 bg-clip-text text-transparent animate-fade-in-up animation-delay-200">
-                one smart platform
+                Premium performance without premium prices
               </span>
             </h1>
             
             <p className="text-xl sm:text-2xl text-zinc-400 mb-12 max-w-3xl mx-auto leading-relaxed animate-fade-in-up animation-delay-400">
-              Why lock yourself into one AI? Access GPT-4, Claude, Llama, and specialized models. 
-              <span className="text-orange-400 font-semibold"> Pay only for what you use.</span>
+              Built for students, developers, and creators who deserve enterprise-grade AI. 
+              <span className="text-orange-400 font-semibold"> Pay only for the days you need brilliance.</span>
             </p>
             
             <div className="flex flex-col sm:flex-row items-center justify-center gap-4 animate-fade-in-up animation-delay-600">
@@ -149,14 +149,14 @@ export default function LumiChatsLanding({ onEnterApp }: LumiChatsLandingProps) 
                       <div className="w-3 h-3 rounded-full bg-zinc-700" />
                       <div className="w-3 h-3 rounded-full bg-zinc-700" />
                     </div>
-                    <span className="text-sm text-zinc-400">LumiChats</span>
+                    <span className="text-sm text-zinc-400">AI Orchestra</span>
                   </div>
                   <div className="flex items-center space-x-2 text-xs text-zinc-500">
-                    <span className="px-2 py-1 bg-zinc-800 rounded">GPT-4</span>
+                    <span className="px-2 py-1 bg-green-900/30 text-green-400 rounded">Spark</span>
                     <span>→</span>
-                    <span className="px-2 py-1 bg-orange-900/30 text-orange-400 rounded">Claude</span>
+                    <span className="px-2 py-1 bg-blue-900/30 text-blue-400 rounded">Nova</span>
                     <span>→</span>
-                    <span className="px-2 py-1 bg-purple-900/30 text-purple-400 rounded">Llama</span>
+                    <span className="px-2 py-1 bg-purple-900/30 text-purple-400 rounded">Titan</span>
                   </div>
                 </div>
                 
@@ -166,24 +166,22 @@ export default function LumiChatsLanding({ onEnterApp }: LumiChatsLandingProps) 
                       You
                     </div>
                     <div className="flex-1 bg-zinc-800/50 rounded-2xl rounded-tl-none p-5 border border-zinc-700/50">
-                      <p className="text-zinc-300">Compare these 3 models for legal analysis</p>
+                      <p className="text-zinc-300">Help me write an essay on climate change</p>
                     </div>
                   </div>
                   
                   <div className="flex items-start space-x-4 animate-slide-in-right animation-delay-300">
                     <img 
                       src="/generated-image (1).png"
-                      alt="LumiChats" 
+                      alt="AI Orchestra" 
                       className="w-10 h-10 rounded-full object-cover flex-shrink-0"
                     />
                     <div className="flex-1 bg-gradient-to-br from-zinc-800/50 to-zinc-900/50 rounded-2xl rounded-tl-none p-5 border border-zinc-700/50">
-                      <p className="text-zinc-200 mb-3">I've analyzed using GPT-4, Claude, and our Legal Specialist model. Here's the comparison...</p>
+                      <p className="text-zinc-200 mb-3">I'll help you craft a comprehensive essay. Here's an outline and key points...</p>
                       <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-                        <span className="px-2 py-1 bg-blue-900/20 text-blue-400 rounded">GPT-4: $0.03</span>
-                        <span className="px-2 py-1 bg-purple-900/20 text-purple-400 rounded">Claude: $0.04</span>
-                        <span className="px-2 py-1 bg-orange-900/20 text-orange-400 rounded">Legal: $0.02</span>
+                        <span className="px-2 py-1 bg-green-900/20 text-green-400 rounded">Spark Plan</span>
                         <span>•</span>
-                        <span className="text-green-400 font-semibold">Total: $0.09</span>
+                        <span className="text-orange-400 font-semibold">Cost: ₹10 today</span>
                       </div>
                     </div>
                   </div>
@@ -194,15 +192,15 @@ export default function LumiChatsLanding({ onEnterApp }: LumiChatsLandingProps) 
         </div>
       </section>
 
-      {/* Why LumiChats Section */}
+      {/* Why AI Orchestra Section */}
       <section id="why" className="relative py-32 px-6 lg:px-8 bg-zinc-900/30">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-20">
             <h2 className="text-4xl sm:text-5xl font-serif mb-6">
-              Why AI orchestration beats subscriptions
+              Why flexible plans beat monthly subscriptions
             </h2>
             <p className="text-xl text-zinc-400 max-w-3xl mx-auto">
-              Traditional AI subscriptions lock you into one model. LumiChats gives you freedom.
+              Traditional AI subscriptions force you to pay monthly. AI Orchestra lets you pay only for the days you actually need.
             </p>
           </div>
 
@@ -211,69 +209,69 @@ export default function LumiChatsLanding({ onEnterApp }: LumiChatsLandingProps) 
             <div className="relative p-8 bg-red-950/10 border border-red-900/30 rounded-2xl">
               <div className="flex items-center space-x-3 mb-6">
                 <X className="w-6 h-6 text-red-400" />
-                <h3 className="text-2xl font-semibold text-red-300">Traditional Subscriptions</h3>
+                <h3 className="text-2xl font-semibold text-red-300">Monthly Subscriptions</h3>
               </div>
               <ul className="space-y-4">
                 <li className="flex items-start space-x-3 text-zinc-400">
                   <X className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                  <span>$20-100/month per AI service</span>
+                  <span>₹1500-5000/month whether you use it or not</span>
                 </li>
                 <li className="flex items-start space-x-3 text-zinc-400">
                   <X className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                  <span>Locked into one AI model</span>
+                  <span>Pay for entire months when you only need a few days</span>
                 </li>
                 <li className="flex items-start space-x-3 text-zinc-400">
                   <X className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                  <span>Pay even when not using</span>
+                  <span>Locked into one pricing tier</span>
                 </li>
                 <li className="flex items-start space-x-3 text-zinc-400">
                   <X className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                  <span>Can't compare model outputs</span>
+                  <span>Can't scale down during slow periods</span>
                 </li>
                 <li className="flex items-start space-x-3 text-zinc-400">
                   <X className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-                  <span>Multiple accounts to manage</span>
+                  <span>Commitment pressure even when not needed</span>
                 </li>
               </ul>
               <div className="mt-8 p-4 bg-red-950/20 rounded-lg border border-red-900/30">
-                <p className="text-lg font-semibold text-red-300">Average cost: $60-300/month</p>
-                <p className="text-sm text-zinc-500 mt-1">For ChatGPT Plus + Claude Pro + others</p>
+                <p className="text-lg font-semibold text-red-300">Average waste: ₹400-1200/month</p>
+                <p className="text-sm text-zinc-500 mt-1">Paying for unused days</p>
               </div>
             </div>
 
-            {/* LumiChats Way */}
+            {/* AI Orchestra Way */}
             <div className="relative p-8 bg-gradient-to-br from-green-950/10 to-orange-950/10 border border-green-900/30 rounded-2xl">
               <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-500 to-green-500 rounded-2xl blur opacity-20" />
               <div className="relative">
                 <div className="flex items-center space-x-3 mb-6">
                   <Check className="w-6 h-6 text-green-400" />
-                  <h3 className="text-2xl font-semibold text-green-300">LumiChats Orchestration</h3>
+                  <h3 className="text-2xl font-semibold text-green-300">AI Orchestra Plans</h3>
                 </div>
                 <ul className="space-y-4">
                   <li className="flex items-start space-x-3 text-zinc-300">
                     <Check className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
-                    <span><strong>Pay-as-you-go</strong> - Only charged for actual usage</span>
+                    <span><strong>Pay per day</strong> - ₹10-25/day when you need it</span>
                   </li>
                   <li className="flex items-start space-x-3 text-zinc-300">
                     <Check className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
-                    <span><strong>10+ models</strong> - Switch instantly between GPT, Claude, Llama</span>
+                    <span><strong>Scale instantly</strong> - Upgrade for intense days, downgrade after</span>
                   </li>
                   <li className="flex items-start space-x-3 text-zinc-300">
                     <Check className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
-                    <span><strong>Specialized AI</strong> - Legal, coding, creative models included</span>
+                    <span><strong>Monthly option</strong> - Save more with ₹299-749/month plans</span>
                   </li>
                   <li className="flex items-start space-x-3 text-zinc-300">
                     <Check className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
-                    <span><strong>Compare responses</strong> - See outputs from multiple models</span>
+                    <span><strong>No commitment</strong> - Activate only when inspiration strikes</span>
                   </li>
                   <li className="flex items-start space-x-3 text-zinc-300">
                     <Check className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
-                    <span><strong>One account</strong> - All models in single interface</span>
+                    <span><strong>All features</strong> - File uploads, image understanding included</span>
                   </li>
                 </ul>
                 <div className="mt-8 p-4 bg-gradient-to-r from-green-950/20 to-orange-950/20 rounded-lg border border-green-900/30">
-                  <p className="text-lg font-semibold text-green-300">Typical cost: $5-30/month</p>
-                  <p className="text-sm text-zinc-400 mt-1">Based on actual usage • Free tier available</p>
+                  <p className="text-lg font-semibold text-green-300">Typical spend: ₹100-400/month</p>
+                  <p className="text-sm text-zinc-400 mt-1">Based on 10-15 active days • Zero waste</p>
                 </div>
               </div>
             </div>
@@ -286,23 +284,23 @@ export default function LumiChatsLanding({ onEnterApp }: LumiChatsLandingProps) 
                 <TrendingDown className="w-8 h-8" />
               </div>
               <h3 className="text-xl font-semibold mb-3">Save 70-90%</h3>
-              <p className="text-zinc-400">Most users save hundreds per year vs. multiple subscriptions</p>
+              <p className="text-zinc-400">Most students save thousands per year vs. traditional monthly plans</p>
             </div>
 
             <div className="text-center p-8 bg-zinc-900/50 rounded-2xl border border-zinc-800 hover:border-orange-900/50 transition-all duration-300">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-purple-500 to-purple-600 flex items-center justify-center">
                 <Layers className="w-8 h-8" />
               </div>
-              <h3 className="text-xl font-semibold mb-3">Best Model for Every Task</h3>
-              <p className="text-zinc-400">Use GPT-4 for reasoning, Claude for writing, specialized models for domains</p>
+              <h3 className="text-xl font-semibold mb-3">Right Plan for Every Task</h3>
+              <p className="text-zinc-400">Use Spark for essays, Nova for projects, Titan for complex analysis</p>
             </div>
 
             <div className="text-center p-8 bg-zinc-900/50 rounded-2xl border border-zinc-800 hover:border-orange-900/50 transition-all duration-300">
               <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-green-500 to-green-600 flex items-center justify-center">
                 <DollarSign className="w-8 h-8" />
               </div>
-              <h3 className="text-xl font-semibold mb-3">Transparent Pricing</h3>
-              <p className="text-zinc-400">See exact costs per query. No hidden fees or surprise charges</p>
+              <h3 className="text-xl font-semibold mb-3">Crystal Clear Pricing</h3>
+              <p className="text-zinc-400">Know exactly what you're paying. Daily or monthly. Your choice.</p>
             </div>
           </div>
         </div>
@@ -313,130 +311,181 @@ export default function LumiChatsLanding({ onEnterApp }: LumiChatsLandingProps) 
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-20">
             <h2 className="text-4xl sm:text-5xl font-serif mb-6">
-              Simple, fair pricing
+              Flexible Plans That Scale With You
             </h2>
             <p className="text-xl text-zinc-400 max-w-2xl mx-auto">
-              Start free. Scale as you grow. Pay only for what you actually use.
+              Pay per day or subscribe monthly. No wasted money, no long commitments.
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-8">
-            {/* Free Tier */}
-            <div className="relative p-8 bg-zinc-900/50 rounded-2xl border border-zinc-800">
-              <h3 className="text-2xl font-semibold mb-2">Free Forever</h3>
-              <p className="text-zinc-400 mb-6">Perfect for trying out the platform</p>
+            {/* Spark Plan */}
+            <div className="relative p-8 bg-gradient-to-br from-green-950/20 to-green-900/10 rounded-2xl border border-green-500/30">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-green-500 text-white text-sm font-semibold rounded-full">
+                🌱 Student Favorite
+              </div>
+              <h3 className="text-2xl font-semibold mb-2 mt-2">Spark Plan</h3>
+              <p className="text-zinc-400 mb-6">Smart choice for everyday brilliance</p>
               <div className="mb-6">
-                <span className="text-4xl font-bold">$0</span>
-                <span className="text-zinc-500">/month</span>
+                <div className="flex items-baseline space-x-2 mb-2">
+                  <span className="text-4xl font-bold text-green-400">₹10</span>
+                  <span className="text-zinc-500">/day</span>
+                </div>
+                <div className="text-sm text-zinc-500">or ₹299/month</div>
               </div>
               <ul className="space-y-3 mb-8">
-                <li className="flex items-center space-x-3">
-                  <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
-                  <span className="text-zinc-300">Access to all models</span>
+                <li className="flex items-start space-x-3">
+                  <Check className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-zinc-300">Analyze notes & generate essays</span>
                 </li>
-                <li className="flex items-center space-x-3">
-                  <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
-                  <span className="text-zinc-300">10 queries per day</span>
+                <li className="flex items-start space-x-3">
+                  <Check className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-zinc-300">Solve advanced reasoning problems</span>
                 </li>
-                <li className="flex items-center space-x-3">
-                  <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
-                  <span className="text-zinc-300">Full conversation history</span>
+                <li className="flex items-start space-x-3">
+                  <Check className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-zinc-300">Hard-level coding challenges</span>
                 </li>
-                <li className="flex items-center space-x-3">
-                  <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
-                  <span className="text-zinc-300">Local storage</span>
+                <li className="flex items-start space-x-3">
+                  <Check className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-zinc-300">Fast & reliable for assignments</span>
+                </li>
+                <li className="flex items-start space-x-3">
+                  <Check className="w-5 h-5 text-green-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-zinc-300">Up to 20 file uploads/day</span>
                 </li>
               </ul>
               <button 
                 onClick={handleEnterApp}
-                className="w-full py-3 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 transition-colors duration-300"
+                className="w-full py-3 bg-green-600 text-white rounded-lg hover:bg-green-500 transition-colors duration-300 font-semibold"
               >
-                Start Free
+                Start with Spark
               </button>
+              <p className="text-center text-xs text-zinc-500 mt-4">Perfect for learners & writers</p>
             </div>
 
-            {/* Pay-as-you-go */}
-            <div className="relative p-8 bg-gradient-to-br from-orange-950/20 to-orange-900/10 rounded-2xl border-2 border-orange-500">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-orange-500 text-white text-sm font-semibold rounded-full">
-                Most Popular
+            {/* Nova Plan */}
+            <div className="relative p-8 bg-gradient-to-br from-blue-950/20 to-blue-900/10 rounded-2xl border-2 border-blue-500">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-blue-500 text-white text-sm font-semibold rounded-full">
+                ⚙ Most Popular
               </div>
-              <h3 className="text-2xl font-semibold mb-2">Pay As You Go</h3>
-              <p className="text-zinc-400 mb-6">Only pay for what you actually use</p>
+              <h3 className="text-2xl font-semibold mb-2 mt-2">Nova Plan</h3>
+              <p className="text-zinc-400 mb-6">Built for creators and coders</p>
               <div className="mb-6">
-                <span className="text-4xl font-bold">$0.01-0.10</span>
-                <span className="text-zinc-500">/query</span>
+                <div className="flex items-baseline space-x-2 mb-2">
+                  <span className="text-4xl font-bold text-blue-400">₹15</span>
+                  <span className="text-zinc-500">/day</span>
+                </div>
+                <div className="text-sm text-zinc-500">or ₹449/month</div>
               </div>
               <ul className="space-y-3 mb-8">
-                <li className="flex items-center space-x-3">
-                  <Check className="w-5 h-5 text-orange-400 flex-shrink-0" />
-                  <span className="text-zinc-300">Unlimited queries</span>
+                <li className="flex items-start space-x-3">
+                  <Check className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-zinc-300">Large document handling</span>
                 </li>
-                <li className="flex items-center space-x-3">
-                  <Check className="w-5 h-5 text-orange-400 flex-shrink-0" />
-                  <span className="text-zinc-300">All premium models</span>
+                <li className="flex items-start space-x-3">
+                  <Check className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-zinc-300">Long-form reasoning</span>
                 </li>
-                <li className="flex items-center space-x-3">
-                  <Check className="w-5 h-5 text-orange-400 flex-shrink-0" />
-                  <span className="text-zinc-300">Priority processing</span>
+                <li className="flex items-start space-x-3">
+                  <Check className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-zinc-300">Multi-step code execution</span>
                 </li>
-                <li className="flex items-center space-x-3">
-                  <Check className="w-5 h-5 text-orange-400 flex-shrink-0" />
-                  <span className="text-zinc-300">API access</span>
+                <li className="flex items-start space-x-3">
+                  <Check className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-zinc-300">Contextual memory</span>
                 </li>
-                <li className="flex items-center space-x-3">
-                  <Check className="w-5 h-5 text-orange-400 flex-shrink-0" />
-                  <span className="text-zinc-300">Transparent cost tracking</span>
+                <li className="flex items-start space-x-3">
+                  <Check className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-zinc-300">Up to 20 file uploads/day</span>
+                </li>
+                <li className="flex items-start space-x-3">
+                  <Check className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-zinc-300">Image understanding</span>
                 </li>
               </ul>
               <button 
                 onClick={handleEnterApp}
-                className="w-full py-3 bg-orange-600 text-white rounded-lg hover:bg-orange-500 transition-colors duration-300"
+                className="w-full py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-500 transition-colors duration-300 font-semibold"
               >
-                Get Started
+                Choose Nova
               </button>
-              <p className="text-center text-xs text-zinc-500 mt-4">Coming soon</p>
+              <p className="text-center text-xs text-zinc-500 mt-4">Ideal for developers & analysts</p>
             </div>
 
-            {/* Enterprise */}
-            <div className="relative p-8 bg-zinc-900/50 rounded-2xl border border-zinc-800">
-              <h3 className="text-2xl font-semibold mb-2">Enterprise</h3>
-              <p className="text-zinc-400 mb-6">For teams and organizations</p>
+            {/* Titan Plan */}
+            <div className="relative p-8 bg-gradient-to-br from-purple-950/20 to-purple-900/10 rounded-2xl border border-purple-500/30">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 bg-purple-500 text-white text-sm font-semibold rounded-full">
+                🚀 Maximum Power
+              </div>
+              <h3 className="text-2xl font-semibold mb-2 mt-2">Titan Plan</h3>
+              <p className="text-zinc-400 mb-6">Power beyond limits</p>
               <div className="mb-6">
-                <span className="text-4xl font-bold">Custom</span>
+                <div className="flex items-baseline space-x-2 mb-2">
+                  <span className="text-4xl font-bold text-purple-400">₹25</span>
+                  <span className="text-zinc-500">/day</span>
+                </div>
+                <div className="text-sm text-zinc-500">or ₹749/month</div>
               </div>
               <ul className="space-y-3 mb-8">
-                <li className="flex items-center space-x-3">
-                  <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
-                  <span className="text-zinc-300">Volume discounts</span>
+                <li className="flex items-start space-x-3">
+                  <Check className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-zinc-300">Massive context handling</span>
                 </li>
-                <li className="flex items-center space-x-3">
-                  <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
-                  <span className="text-zinc-300">Dedicated support</span>
+                <li className="flex items-start space-x-3">
+                  <Check className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-zinc-300">Complex debugging & analysis</span>
                 </li>
-                <li className="flex items-center space-x-3">
-                  <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
-                  <span className="text-zinc-300">Custom model training</span>
+                <li className="flex items-start space-x-3">
+                  <Check className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-zinc-300">Real-time problem solving</span>
                 </li>
-                <li className="flex items-center space-x-3">
-                  <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
-                  <span className="text-zinc-300">SSO & compliance</span>
+                <li className="flex items-start space-x-3">
+                  <Check className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-zinc-300">Ultra-fast processing</span>
                 </li>
-                <li className="flex items-center space-x-3">
-                  <Check className="w-5 h-5 text-green-400 flex-shrink-0" />
-                  <span className="text-zinc-300">SLA guarantees</span>
+                <li className="flex items-start space-x-3">
+                  <Check className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-zinc-300">Up to 20 file uploads/day</span>
+                </li>
+                <li className="flex items-start space-x-3">
+                  <Check className="w-5 h-5 text-purple-400 flex-shrink-0 mt-0.5" />
+                  <span className="text-zinc-300">Deep reasoning & adaptation</span>
                 </li>
               </ul>
-              <button className="w-full py-3 bg-zinc-800 text-white rounded-lg hover:bg-zinc-700 transition-colors duration-300">
-                Contact Sales
+              <button 
+                onClick={handleEnterApp}
+                className="w-full py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-500 transition-colors duration-300 font-semibold"
+              >
+                Unlock Titan
               </button>
+              <p className="text-center text-xs text-zinc-500 mt-4">For power users & researchers</p>
             </div>
           </div>
 
-          <div className="mt-12 p-6 bg-zinc-900/30 rounded-2xl border border-zinc-800 text-center">
-            <p className="text-zinc-400">
-              <strong className="text-white">Real example:</strong> A developer using ChatGPT Plus ($20/mo) + Claude Pro ($20/mo) = $40/month. 
-              With LumiChats pay-as-you-go, same usage costs <strong className="text-green-400">~$8-15/month</strong>. 
-              <span className="text-orange-400 font-semibold"> Save over 60%</span>
+          <div className="mt-12 p-6 bg-zinc-900/30 rounded-2xl border border-zinc-800">
+            <h3 className="text-lg font-semibold mb-4 text-center">📂 All Plans Include</h3>
+            <div className="grid md:grid-cols-3 gap-4 text-sm">
+              <div className="flex items-center space-x-2 text-zinc-400">
+                <Check className="w-4 h-4 text-orange-400" />
+                <span><strong className="text-white">File Uploads:</strong> Up to 20/day</span>
+              </div>
+              <div className="flex items-center space-x-2 text-zinc-400">
+                <Check className="w-4 h-4 text-orange-400" />
+                <span><strong className="text-white">Image Understanding:</strong> Built-in</span>
+              </div>
+              <div className="flex items-center space-x-2 text-zinc-400">
+                <Check className="w-4 h-4 text-orange-400" />
+                <span><strong className="text-white">Pay-as-you-go:</strong> Ultimate freedom</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-8 p-6 bg-gradient-to-r from-orange-950/20 to-orange-900/10 rounded-2xl border border-orange-500/30 text-center">
+            <p className="text-zinc-300">
+              <strong className="text-white">💡 Why Students Love AI Orchestra:</strong> Students don't need 30-day subscriptions for a few intense hours of work. 
+              Get <strong className="text-orange-400">enterprise-grade intelligence</strong> exactly when inspiration strikes — 
+              starting at less than the price of a coffee. ☕
             </p>
           </div>
         </div>
@@ -458,8 +507,8 @@ export default function LumiChatsLanding({ onEnterApp }: LumiChatsLandingProps) 
             {[
               {
                 icon: Layers,
-                title: "Multiple AI Models",
-                description: "Switch between GPT-4, Claude, Llama, and specialized models trained for legal, coding, and creative tasks."
+                title: "Flexible Plans",
+                description: "Choose from Spark, Nova, or Titan plans. Scale up for intense work, scale down when you're done. Perfect for students and creators."
               },
               {
                 icon: Brain,
@@ -479,12 +528,12 @@ export default function LumiChatsLanding({ onEnterApp }: LumiChatsLandingProps) 
               {
                 icon: Zap,
                 title: "Real-time Tracking",
-                description: "Monitor token usage, model performance, and costs transparently. Know exactly what you're using."
+                description: "Monitor usage and costs transparently. Know exactly what you're using each day."
               },
               {
                 icon: Users,
-                title: "Team Collaboration",
-                description: "Share conversations, build knowledge bases, and collaborate with your team on complex projects."
+                title: "File & Image Support",
+                description: "Upload documents, analyze images, and get insights directly from your files. Up to 20 uploads per day."
               }
             ].map((feature, i) => (
               <div
@@ -525,24 +574,24 @@ export default function LumiChatsLanding({ onEnterApp }: LumiChatsLandingProps) 
           <div className="space-y-16">
             {[
               {
+                title: "For Students",
+                description: "Write essays, solve problems, and learn concepts faster. Spark Plan handles assignments perfectly, while Nova helps with research projects.",
+                gradient: "from-green-500/10 to-teal-500/10"
+              },
+              {
                 title: "For Developers",
-                description: "Debug complex issues, architect solutions, and generate production-ready code with specialized models trained on technical documentation.",
+                description: "Debug complex issues, architect solutions, and generate production-ready code. Nova and Titan plans offer the power you need for serious coding.",
                 gradient: "from-blue-500/10 to-purple-500/10"
               },
               {
-                title: "For Legal Teams",
-                description: "Analyze contracts, research case law, and draft legal documents with AI trained specifically for legal analysis and compliance.",
-                gradient: "from-orange-500/10 to-red-500/10"
-              },
-              {
                 title: "For Creative Professionals",
-                description: "Brainstorm ideas, refine copy, and develop content strategies with models that understand nuance, tone, and creative direction.",
+                description: "Brainstorm ideas, refine copy, and develop content strategies. All plans understand nuance, tone, and creative direction.",
                 gradient: "from-pink-500/10 to-purple-500/10"
               },
               {
                 title: "For Researchers",
-                description: "Compare responses across different models, analyze reasoning patterns, and maintain detailed conversation histories for academic projects.",
-                gradient: "from-green-500/10 to-teal-500/10"
+                description: "Analyze data, synthesize information, and maintain detailed conversation histories. Titan Plan provides the depth needed for academic work.",
+                gradient: "from-orange-500/10 to-red-500/10"
               }
             ].map((useCase, i) => (
               <div
@@ -565,10 +614,10 @@ export default function LumiChatsLanding({ onEnterApp }: LumiChatsLandingProps) 
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {[
-              { number: "10+", label: "AI Models", suffix: "" },
-              { number: "100", label: "Privacy", suffix: "%" },
-              { number: "∞", label: "Conversations", suffix: "" },
-              { number: "0", label: "To Start", suffix: "$" }
+              { number: "3", label: "Flexible Plans", suffix: "" },
+              { number: "20", label: "Files/Day", suffix: "" },
+              { number: "₹10", label: "Starting From", suffix: "" },
+              { number: "0", label: "Commitment", suffix: "" }
             ].map((stat, i) => (
               <div key={i} className="text-center group cursor-pointer">
                 <div className="text-5xl md:text-6xl font-bold mb-2 bg-gradient-to-br from-orange-400 to-orange-600 bg-clip-text text-transparent group-hover:from-orange-300 group-hover:to-orange-500 transition-all duration-300">
@@ -589,10 +638,10 @@ export default function LumiChatsLanding({ onEnterApp }: LumiChatsLandingProps) 
             
             <div className="relative z-10">
               <h2 className="text-4xl sm:text-5xl font-serif mb-6">
-                Ready to transform your workflow?
+                Ready to work smarter?
               </h2>
               <p className="text-xl text-zinc-400 mb-10 max-w-2xl mx-auto">
-                Join thousands who've discovered a smarter way to work with AI. Start for free, upgrade when you need more.
+                Join thousands who've discovered intelligent AI access. Pay only for the days you need brilliance.
               </p>
               
               <button
@@ -618,13 +667,13 @@ export default function LumiChatsLanding({ onEnterApp }: LumiChatsLandingProps) 
             <div className="flex items-center space-x-2 mb-4 md:mb-0">
               <img 
                 src="/generated-image (1).png"
-                alt="LumiChats Logo" 
+                alt="AI Orchestra Logo" 
                 className="w-6 h-6 object-contain"
               />
-              <span className="text-lg font-serif">LumiChats</span>
+              <span className="text-lg font-serif">AI Orchestra</span>
             </div>
             <div className="text-zinc-500 text-sm">
-              © 2024 LumiChats. AI orchestration platform.
+              © 2024 AI Orchestra. Power meets flexibility.
             </div>
           </div>
         </div>
