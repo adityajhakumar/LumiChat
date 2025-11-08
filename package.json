@@ -45,7 +45,7 @@
     "date-fns": "4.1.0",
     "embla-carousel-react": "8.5.1",
     "input-otp": "1.4.1",
-    "katex": "latest",
+    "katex": "0.16.25",
     "lucide-react": "^0.454.0",
     "mammoth": "latest",
     "next": "16.0.0",

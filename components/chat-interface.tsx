@@ -2,7 +2,7 @@
 
 import type React from "react"
 import QuizMode from "./quiz-mode"
-import { FileText, X, ArrowUp } from "lucide-react"
+import { FileText, X, ArrowUp, Brain, ChevronDown, ChevronUp } from "lucide-react"
 
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
@@ -27,12 +27,10 @@ interface ChatInterfaceProps {
   currentStudySession?: any
 }
 
-// Type for fallback chains
 type FallbackChains = {
   [key: string]: string[];
 }
 
-// Fallback configuration
 const MODEL_FALLBACK_CONFIG: {
   fallbackChains: FallbackChains;
   universalFallbacks: string[];
@@ -96,7 +94,12 @@ export default function ChatInterface({
   const [editedContent, setEditedContent] = useState("")
   const [userScrolled, setUserScrolled] = useState(false)
   
-  // Fallback states
+  // Reasoning states
+  const [useReasoning, setUseReasoning] = useState(false)
+  const [reasoningEffort, setReasoningEffort] = useState<"low" | "medium" | "high">("medium")
+  const [showReasoningPanel, setShowReasoningPanel] = useState(false)
+  const [currentReasoning, setCurrentReasoning] = useState<string | null>(null)
+  
   const [fallbackInfo, setFallbackInfo] = useState<{
     originalModel: string;
     usedModel: string;
@@ -219,7 +222,6 @@ export default function ChatInterface({
     setPdfImages(images)
   }
 
-  // Enhanced API call with fallback mechanism
   const sendMessageToAPIWithFallback = async (
     messagesToSend: Array<{ role: string; content: string }>,
     includeFileContent = false,
@@ -260,6 +262,8 @@ export default function ChatInterface({
             fileContent: includeFileContent && attachedFile?.content ? attachedFile.content : undefined,
             fileName: includeFileContent && attachedFile?.name ? attachedFile.name : undefined,
             studyMode: studyMode,
+            useReasoning: useReasoning,
+            reasoningEffort: reasoningEffort,
           }),
         });
         
@@ -325,6 +329,7 @@ export default function ChatInterface({
     setAttachedImage(null)
     setPdfImages([])
     setFallbackInfo(null)
+    setCurrentReasoning(null)
 
     setTimeout(() => scrollToBottom(true), 50)
     setLoading(true)
@@ -370,6 +375,11 @@ export default function ChatInterface({
       })
       
       setTimeout(() => setFallbackInfo(null), 6000)
+    }
+
+    if (data.reasoning) {
+      setCurrentReasoning(data.reasoning)
+      setShowReasoningPanel(true)
     }
 
     if (studyMode) {
@@ -423,6 +433,11 @@ export default function ChatInterface({
     setLoading(false)
     
     if (!result) return
+
+    if (result.data.reasoning) {
+      setCurrentReasoning(result.data.reasoning)
+      setShowReasoningPanel(true)
+    }
     
     const assistantMessage = { 
       role: "assistant", 
@@ -448,6 +463,11 @@ export default function ChatInterface({
     setLoading(false)
     
     if (!result) return
+
+    if (result.data.reasoning) {
+      setCurrentReasoning(result.data.reasoning)
+      setShowReasoningPanel(true)
+    }
     
     const assistantMessage = { 
       role: "assistant", 
@@ -476,6 +496,8 @@ export default function ChatInterface({
           messages: [...messages, ...threadMessages],
           model: selectedModel,
           studyMode: false,
+          useReasoning: useReasoning,
+          reasoningEffort: reasoningEffort,
         }),
       })
 
@@ -484,6 +506,11 @@ export default function ChatInterface({
       if (data.error) {
         console.error(data.error)
         return "Sorry, I couldn't generate a response. Please try again."
+      }
+
+      if (data.reasoning) {
+        setCurrentReasoning(data.reasoning)
+        setShowReasoningPanel(true)
       }
 
       onTokenCountChange(data.tokenCount || 0)
@@ -506,6 +533,11 @@ export default function ChatInterface({
     setLoading(false)
     
     if (!result) return
+
+    if (result.data.reasoning) {
+      setCurrentReasoning(result.data.reasoning)
+      setShowReasoningPanel(true)
+    }
 
     if (result.data.lessonSteps) {
       setLessonSteps(result.data.lessonSteps)
@@ -538,6 +570,11 @@ Provide constructive feedback and suggestions for improvement.`
     setLoading(false)
     
     if (!result) return
+
+    if (result.data.reasoning) {
+      setCurrentReasoning(result.data.reasoning)
+      setShowReasoningPanel(true)
+    }
 
     if (result.data.lessonSteps) {
       setLessonSteps(result.data.lessonSteps)
@@ -614,10 +651,155 @@ Format as JSON with this structure:
     setQuizData(null)
   }
 
+  // Check if current model supports reasoning
+  const supportsReasoning = 
+    selectedModel.includes("minimax") || 
+    selectedModel.includes("deepseek-r1") ||
+    selectedModel.includes("reasoning") ||
+    selectedModel.includes("tongyi-deepresearch") ||
+    selectedModel.includes("qwq")
+
+  // Reasoning Panel Component
+  const ReasoningPanel = () => {
+    if (!currentReasoning) return null
+
+    // Parse reasoning into structured sections if possible
+    const parseReasoning = (text: string) => {
+      const lines = text.split('\n').filter(line => line.trim())
+      const sections: { title?: string; content: string[] }[] = []
+      let currentSection: { title?: string; content: string[] } = { content: [] }
+
+      lines.forEach(line => {
+        // Check if line looks like a header (all caps, ends with colon, etc)
+        if (line.match(/^[A-Z][A-Za-z\s]+:/) || line.match(/^\d+\./)) {
+          if (currentSection.content.length > 0) {
+            sections.push(currentSection)
+          }
+          currentSection = { title: line, content: [] }
+        } else {
+          currentSection.content.push(line)
+        }
+      })
+      
+      if (currentSection.content.length > 0 || currentSection.title) {
+        sections.push(currentSection)
+      }
+
+      return sections.length > 0 ? sections : [{ content: lines }]
+    }
+
+    const reasoningSections = parseReasoning(currentReasoning)
+
+    return (
+      <div className="border-t border-[#2E2E2E] bg-[#1A1A1A]">
+        <button
+          onClick={() => setShowReasoningPanel(!showReasoningPanel)}
+          className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#242424] transition-colors"
+        >
+          <div className="flex items-center gap-2">
+            <div className="w-5 h-5 rounded-full bg-[#CC785C]/10 flex items-center justify-center">
+              <Brain size={14} className="text-[#CC785C]" />
+            </div>
+            <span className="text-sm font-medium text-[#E5E5E0]">
+              Thinking Process
+            </span>
+            <span className="text-xs text-[#6B6B65] font-normal">
+              See how the model reasoned
+            </span>
+          </div>
+          {showReasoningPanel ? 
+            <ChevronUp size={18} className="text-[#6B6B65]" /> : 
+            <ChevronDown size={18} className="text-[#6B6B65]" />
+          }
+        </button>
+        
+        {showReasoningPanel && (
+          <div className="px-4 pb-4">
+            <div className="bg-[#222222] rounded-lg border border-[#2E2E2E] max-h-80 overflow-y-auto">
+              <div className="p-4 space-y-4">
+                {reasoningSections.map((section, idx) => (
+                  <div key={idx} className="space-y-2">
+                    {section.title && (
+                      <div className="flex items-start gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-[#CC785C] mt-2 flex-shrink-0" />
+                        <h4 className="text-sm font-medium text-[#E5E5E0] leading-relaxed">
+                          {section.title}
+                        </h4>
+                      </div>
+                    )}
+                    {section.content.length > 0 && (
+                      <div className="pl-3.5 space-y-1.5">
+                        {section.content.map((line, lineIdx) => (
+                          <p key={lineIdx} className="text-sm text-[#9B9B95] leading-relaxed">
+                            {line}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Reasoning Controls Component
+  const ReasoningControls = () => {
+    if (!supportsReasoning) return null
+
+    return (
+      <div className="mb-3 rounded-xl border border-[#2E2E2E] bg-[#1E1E1E] overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3">
+          <label className="flex items-center gap-3 cursor-pointer group">
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={useReasoning}
+                onChange={(e) => setUseReasoning(e.target.checked)}
+                className="peer sr-only"
+              />
+              <div className="w-11 h-6 bg-[#2A2A2A] rounded-full peer-checked:bg-[#CC785C] transition-all"></div>
+              <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all peer-checked:translate-x-5"></div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Brain size={16} className="text-[#CC785C]" />
+              <span className="text-sm font-medium text-[#E5E5E0]">
+                Enhanced Reasoning
+              </span>
+            </div>
+          </label>
+
+          {useReasoning && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-[#6B6B65]">Effort:</span>
+              <select
+                value={reasoningEffort}
+                onChange={(e) => setReasoningEffort(e.target.value as "low" | "medium" | "high")}
+                className="px-3 py-1.5 rounded-lg bg-[#2A2A2A] border border-[#3A3A3A] text-sm text-[#E5E5E0] focus:border-[#CC785C] focus:ring-1 focus:ring-[#CC785C] transition-all"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+          )}
+        </div>
+        
+        {useReasoning && (
+          <div className="px-4 pb-3 text-xs text-[#6B6B65]">
+            The model will show its step-by-step thinking process
+          </div>
+        )}
+      </div>
+    )
+  }
+
   if (studyMode) {
     return (
       <div ref={containerRef} className="flex h-full bg-[#1E1E1E] text-white overflow-hidden">
-        {/* Retry Status Toast */}
         {retryStatus.show && (
           <div className="fixed top-20 right-4 bg-[#2A2A2A] border border-yellow-600/50 rounded-lg p-3 shadow-xl z-50 max-w-xs animate-in slide-in-from-right duration-200">
             <div className="flex items-center gap-3">
@@ -636,7 +818,6 @@ Format as JSON with this structure:
           </div>
         )}
 
-        {/* Fallback Success Notification */}
         {fallbackInfo && (
           <div className="fixed top-20 right-4 bg-[#2A2A2A] border border-[#CC785C] rounded-lg p-4 shadow-xl z-50 max-w-sm animate-in slide-in-from-right duration-300">
             <div className="flex items-start gap-3">
@@ -691,6 +872,7 @@ Format as JSON with this structure:
           ) : lessonSteps.length > 0 ? (
             <>
               <LessonCard steps={lessonSteps} onComplete={handleLessonComplete} onCodeFeedback={handleCodeFeedback} />
+              <ReasoningPanel />
               <div className="border-t border-[#2E2E2E] bg-[#171717] p-3 md:p-4 flex-shrink-0">
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-medium text-[#6B6B65] uppercase">Ask a follow-up question</label>
@@ -726,6 +908,8 @@ Format as JSON with this structure:
                   </div>
                 </div>
               </div>
+
+              <ReasoningControls />
 
               <div className="border-t border-[#2E2E2E] bg-[#171717] p-3 md:p-6 flex-shrink-0">
                 <div className="flex flex-col md:flex-row gap-2 md:gap-3">
@@ -777,7 +961,6 @@ Format as JSON with this structure:
 
   return (
     <div className="flex flex-col h-full bg-[#1E1E1E] text-white overflow-hidden">
-      {/* Retry Status Toast */}
       {retryStatus.show && (
         <div className="fixed top-20 right-4 bg-[#2A2A2A] border border-yellow-600/50 rounded-lg p-3 shadow-xl z-50 max-w-xs animate-in slide-in-from-right duration-200">
           <div className="flex items-center gap-3">
@@ -796,7 +979,6 @@ Format as JSON with this structure:
         </div>
       )}
 
-      {/* Fallback Success Notification */}
       {fallbackInfo && (
         <div className="fixed top-20 right-4 bg-[#2A2A2A] border border-[#CC785C] rounded-lg p-4 shadow-xl z-50 max-w-sm animate-in slide-in-from-right duration-300">
           <div className="flex items-start gap-3">
@@ -924,8 +1106,12 @@ Format as JSON with this structure:
         </div>
       )}
 
+      <ReasoningPanel />
+
       <div className="bg-[#1E1E1E] px-3 sm:px-4 pb-4 sm:pb-6 pt-3 sm:pt-4 flex-shrink-0">
         <div className="max-w-3xl mx-auto">
+          <ReasoningControls />
+
           <div className="sm:hidden mb-3">
             <ModelSelector 
               selectedModel={selectedModel} 

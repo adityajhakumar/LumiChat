@@ -89,23 +89,20 @@ export async function POST(request: NextRequest) {
       fileContent, 
       fileName,
       studyMode, 
-      skillLevel = "beginner" 
+      skillLevel = "beginner",
+      useReasoning = false,
+      reasoningEffort = "medium"
     } = await request.json()
 
     if (!messages || !model) {
       return NextResponse.json({ error: "Missing messages or model" }, { status: 400 })
     }
 
-    // FIXED: Add file content to system prompt or first user message
-    // This ensures context is maintained throughout the conversation
     const formattedMessages = messages.map((msg: any, index: number) => {
       if (msg.role === "user") {
         const contentParts: any[] = []
         
-        // For the FIRST user message after file upload, include file content
-        // For subsequent messages, the file context is already in conversation history
         if (index === messages.length - 1) {
-          // Last message - add new images/file if provided
           if (fileContent && fileContent.trim()) {
             const fileContext = fileName 
               ? `\n\n[File: ${fileName}]\n${fileContent}\n[End of file content]\n\n`
@@ -119,7 +116,6 @@ export async function POST(request: NextRequest) {
             contentParts.push({ type: "text", text: msg.content })
           }
           
-          // Add single image
           if (image) {
             contentParts.push({
               type: "image_url",
@@ -127,7 +123,6 @@ export async function POST(request: NextRequest) {
             })
           }
           
-          // Add multiple images (for PDF pages)
           if (images && Array.isArray(images) && images.length > 0) {
             const imagesToSend = images.slice(0, 5)
             imagesToSend.forEach((img: string) => {
@@ -142,7 +137,6 @@ export async function POST(request: NextRequest) {
             }
           }
         } else {
-          // Previous messages - keep as is
           contentParts.push({ type: "text", text: msg.content })
         }
         
@@ -235,12 +229,26 @@ If anyone asks who made you or who developed you, always respond:
 Keep responses clear, polite, and engaging.`
     }
 
-    // Try each API key until one works
     let lastError: any = null
     for (const apiKey of API_KEYS) {
       if (!apiKey) continue
 
       try {
+        const requestBody: any = {
+          model,
+          messages: [{ role: "system", content: systemPrompt }, ...formattedMessages],
+          temperature: 0.7,
+          max_tokens: 15000,
+        }
+
+        // Add reasoning configuration if enabled
+        if (useReasoning) {
+          requestBody.reasoning = {
+            effort: reasoningEffort,
+            exclude: false
+          }
+        }
+
         const response = await fetch(OPENROUTER_API_URL, {
           method: "POST",
           headers: {
@@ -249,12 +257,7 @@ Keep responses clear, polite, and engaging.`
             "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
             "X-Title": "LumiChats By TheVersync",
           },
-          body: JSON.stringify({
-            model,
-            messages: [{ role: "system", content: systemPrompt }, ...formattedMessages],
-            temperature: 0.7,
-            max_tokens: 15000,
-          }),
+          body: JSON.stringify(requestBody),
         })
 
         if (!response.ok) {
@@ -264,6 +267,7 @@ Keep responses clear, polite, and engaging.`
 
         const data = await response.json()
         const content = data.choices[0]?.message?.content || ""
+        const reasoning = data.choices[0]?.message?.reasoning || null
         const tokenCount = data.usage?.total_tokens || 0
 
         let lessonSteps = undefined
@@ -273,6 +277,7 @@ Keep responses clear, polite, and engaging.`
 
         return NextResponse.json({
           content,
+          reasoning,
           tokenCount,
           lessonSteps,
         })

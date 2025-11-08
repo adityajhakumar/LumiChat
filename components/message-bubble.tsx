@@ -2,10 +2,7 @@
 
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
-import remarkMath from "remark-math"
-import rehypeKatex from "rehype-katex"
 import { Copy, RotateCw, ThumbsUp, ThumbsDown, Check, Edit2, MessageSquare, ChevronRight, X } from "lucide-react"
-import "katex/dist/katex.min.css" // Add this line!
 import { useState, useEffect, useRef } from "react"
 import { Textarea } from "@/components/ui/textarea"
 
@@ -168,7 +165,6 @@ function ThreadSection({
 
   return (
     <div className="my-4 border-l-2 border-[#CC785C] pl-4 bg-[#1A1A1A] rounded-r-lg py-3 thread-section animate-in fade-in slide-in-from-left-2 duration-300">
-      {/* Thread Header */}
       <div className="flex items-center justify-between mb-3">
         <button
           onClick={onToggle}
@@ -191,7 +187,6 @@ function ThreadSection({
         </button>
       </div>
 
-      {/* Context Badge */}
       <div className="mb-3 p-2 bg-[#252525] rounded-lg border border-[#3A3A3A] transition-colors hover:border-[#CC785C]/50">
         <span className="text-xs text-[#A0A0A0] block mb-1">Discussing:</span>
         <p className="text-xs text-[#D4D4D4] italic line-clamp-2">
@@ -199,12 +194,10 @@ function ThreadSection({
         </p>
       </div>
 
-      {/* Thread Content */}
       <div className={`overflow-hidden transition-all duration-300 ${
         thread.collapsed ? 'max-h-0 opacity-0' : 'max-h-[2000px] opacity-100'
       }`}>
         <div className="space-y-3">
-          {/* Messages */}
           {thread.messages.map((msg, idx) => (
             <div 
               key={idx} 
@@ -251,7 +244,6 @@ function ThreadSection({
             </div>
           )}
 
-          {/* Reply Input */}
           <div className="pt-2 border-t border-[#2A2A2A]">
             <Textarea
               ref={textareaRef}
@@ -277,7 +269,6 @@ function ThreadSection({
   )
 }
 
-// Component to split content and insert threads at specific positions
 function ContentWithThreads({ 
   content, 
   threads,
@@ -291,14 +282,12 @@ function ContentWithThreads({
   onReply: (id: string, msg: string) => Promise<void>
   onClose: (id: string) => void
 }) {
-  // Sort threads by position (earliest first)
   const sortedThreads = [...threads].sort((a, b) => a.insertPosition - b.insertPosition)
   
   if (sortedThreads.length === 0) {
     return (
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath]}
-        rehypePlugins={[rehypeKatex]}
+        remarkPlugins={[remarkGfm]}
         components={getMarkdownComponents()}
       >
         {content}
@@ -312,34 +301,28 @@ function ContentWithThreads({
   sortedThreads.forEach((thread, idx) => {
     let insertPos = thread.insertPosition
     
-    // Check if we're inside a code block
     const beforeText = content.substring(0, insertPos)
     const afterText = content.substring(insertPos)
     
-    // Count code block markers before and after the position
     const codeBlocksBefore = (beforeText.match(/```/g) || []).length
     const isInsideCodeBlock = codeBlocksBefore % 2 !== 0
     
     if (isInsideCodeBlock) {
-      // Find the end of the current code block
       const codeBlockEnd = afterText.indexOf('```')
       if (codeBlockEnd !== -1) {
-        insertPos = insertPos + codeBlockEnd + 3 // Move past the closing ```
-        // Skip any whitespace after code block
+        insertPos = insertPos + codeBlockEnd + 3
         while (insertPos < content.length && /\s/.test(content[insertPos])) {
           insertPos++
         }
       }
     }
     
-    // Add content up to and including the selected text
     const beforeContent = content.substring(lastIndex, insertPos)
     if (beforeContent) {
       parts.push(
         <div key={`content-${idx}`}>
           <ReactMarkdown
-            remarkPlugins={[remarkGfm, remarkMath]}
-            rehypePlugins={[rehypeKatex]}
+            remarkPlugins={[remarkGfm]}
             components={getMarkdownComponents()}
           >
             {beforeContent}
@@ -348,7 +331,6 @@ function ContentWithThreads({
       )
     }
 
-    // Add the thread immediately after the selected text
     parts.push(
       <ThreadSection
         key={thread.id}
@@ -362,14 +344,12 @@ function ContentWithThreads({
     lastIndex = insertPos
   })
 
-  // Add remaining content after last thread
   const remainingContent = content.substring(lastIndex)
   if (remainingContent) {
     parts.push(
       <div key="content-end">
         <ReactMarkdown
-          remarkPlugins={[remarkGfm, remarkMath]}
-          rehypePlugins={[rehypeKatex]}
+          remarkPlugins={[remarkGfm]}
           components={getMarkdownComponents()}
         >
           {remainingContent}
@@ -477,14 +457,12 @@ export default function MessageBubble({
     onFeedback?.(type)
   }
 
-  // Find exact position of selected text in the original content using DOM position
   const findTextPosition = (selectedText: string, range: Range): { start: number; end: number } => {
     if (!messageRef.current) {
       return { start: 0, end: 0 }
     }
 
     try {
-      // Get all text nodes in the message
       const walker = document.createTreeWalker(
         messageRef.current,
         NodeFilter.SHOW_TEXT,
@@ -496,14 +474,11 @@ export default function MessageBubble({
       let foundStart = -1
       let foundEnd = -1
 
-      // Walk through all text nodes and find position
       while ((node = walker.nextNode())) {
         const textContent = node.textContent || ''
         
-        // Check if this node contains the start of our selection
         if (range.startContainer === node || range.startContainer.contains(node) || node.contains(range.startContainer)) {
           if (foundStart === -1) {
-            // Calculate offset based on range
             if (range.startContainer === node) {
               foundStart = currentPos + range.startOffset
             } else if (node.contains(range.startContainer)) {
@@ -512,7 +487,6 @@ export default function MessageBubble({
           }
         }
 
-        // Check if this node contains the end of our selection
         if (range.endContainer === node || range.endContainer.contains(node) || node.contains(range.endContainer)) {
           if (range.endContainer === node) {
             foundEnd = currentPos + range.endOffset
@@ -524,7 +498,6 @@ export default function MessageBubble({
         currentPos += textContent.length
       }
 
-      // Fallback: use indexOf if DOM position detection failed
       if (foundStart === -1 || foundEnd === -1) {
         const index = message.content.indexOf(selectedText)
         if (index !== -1) {
@@ -536,7 +509,6 @@ export default function MessageBubble({
       return { start: foundStart, end: foundEnd }
     } catch (error) {
       console.error('Error finding text position:', error)
-      // Fallback to simple search
       const index = message.content.indexOf(selectedText)
       if (index !== -1) {
         return { start: index, end: index + selectedText.length }
@@ -545,7 +517,6 @@ export default function MessageBubble({
     }
   }
 
-  // Handle text selection for threading
   useEffect(() => {
     const handleMouseUp = (e: MouseEvent) => {
       if (!messageRef.current || isUser) return
@@ -564,16 +535,13 @@ export default function MessageBubble({
             const rect = range.getBoundingClientRect()
             const messageRect = messageRef.current.getBoundingClientRect()
             
-            // Smart positioning: prefer right side, but check screen bounds
             let x = rect.right + 10
             let y = rect.top + window.scrollY
             
-            // If button would go off screen, position to the left
             if (x + 150 > window.innerWidth) {
               x = rect.left - 150
             }
             
-            // Ensure it's within the message bounds horizontally
             if (x < messageRect.left) {
               x = messageRect.left + 10
             }
@@ -626,7 +594,6 @@ export default function MessageBubble({
     setShowThreadButton(false)
     setSelectedText("")
     
-    // Smooth deselection with fade effect
     const selection = window.getSelection()
     if (selection) {
       setTimeout(() => selection.removeAllRanges(), 150)
@@ -719,7 +686,7 @@ export default function MessageBubble({
         <div className="w-full max-w-full sm:max-w-[90%] md:max-w-[85%]">
           <div className="bg-transparent text-[#ECECEC] py-1">
             <div
-              className="prose prose-invert max-w-none prose-table:border-collapse prose-table:w-full prose-th:border prose-th:border-[#3A3A3A] prose-th:bg-[#2A2A2A] prose-th:px-4 prose-th:py-2 prose-th:text-left prose-th:font-semibold prose-td:border prose-td:border-[#3A3A3A] prose-td:px-4 prose-td:py-2 prose-p:leading-7 prose-p:my-4 prose-headings:font-semibold prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-ul:my-4 prose-ol:my-4 prose-li:my-1"
+              className="prose prose-invert max-w-none"
               style={{ fontFamily: '"Tiempos Text", Charter, Georgia, serif' }}
             >
               <ContentWithThreads
@@ -732,7 +699,6 @@ export default function MessageBubble({
             </div>
           </div>
 
-          {/* Action Buttons */}
           <div className="flex items-center gap-1 mt-3 mb-2">
             <button
               onClick={handleCopy}

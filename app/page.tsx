@@ -7,7 +7,7 @@ import TokenCounter from "@/components/token-counter"
 import ShareChat from "@/components/share-chat"
 import { Menu, MessageSquare, Trash2, BookOpen, Plus, Sparkles, MoreHorizontal } from "lucide-react"
 import LumiChatsLanding from "@/components/landing-page"
-import "katex/dist/katex.min.css"
+
 
 interface ChatSession {
   id: string
