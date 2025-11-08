@@ -659,89 +659,39 @@ Format as JSON with this structure:
     selectedModel.includes("tongyi-deepresearch") ||
     selectedModel.includes("qwq")
 
-  // Reasoning Panel Component
-  const ReasoningPanel = () => {
-    if (!currentReasoning) return null
-
-    // Parse reasoning into structured sections if possible
-    const parseReasoning = (text: string) => {
-      const lines = text.split('\n').filter(line => line.trim())
-      const sections: { title?: string; content: string[] }[] = []
-      let currentSection: { title?: string; content: string[] } = { content: [] }
-
-      lines.forEach(line => {
-        // Check if line looks like a header (all caps, ends with colon, etc)
-        if (line.match(/^[A-Z][A-Za-z\s]+:/) || line.match(/^\d+\./)) {
-          if (currentSection.content.length > 0) {
-            sections.push(currentSection)
-          }
-          currentSection = { title: line, content: [] }
-        } else {
-          currentSection.content.push(line)
-        }
-      })
-      
-      if (currentSection.content.length > 0 || currentSection.title) {
-        sections.push(currentSection)
-      }
-
-      return sections.length > 0 ? sections : [{ content: lines }]
-    }
-
-    const reasoningSections = parseReasoning(currentReasoning)
+  // Reasoning Panel Component - Simple ChatGPT style
+  const ReasoningPanel = ({ reasoning }: { reasoning: string }) => {
+    const [isExpanded, setIsExpanded] = useState(false)
 
     return (
-      <div className="border-t border-[#2E2E2E] bg-[#1A1A1A]">
-        <button
-          onClick={() => setShowReasoningPanel(!showReasoningPanel)}
-          className="w-full flex items-center justify-between px-4 py-3 hover:bg-[#242424] transition-colors"
-        >
-          <div className="flex items-center gap-2">
-            <div className="w-5 h-5 rounded-full bg-[#CC785C]/10 flex items-center justify-center">
-              <Brain size={14} className="text-[#CC785C]" />
+      <div className="mb-3">
+        <div className="bg-[#2A2A2A] rounded-lg border border-[#3A3A3A] overflow-hidden">
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#2E2E2E] transition-colors text-left"
+          >
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <Brain size={16} className="text-[#CC785C] flex-shrink-0" />
+              <span className="text-sm text-[#9B9B95]">
+                Thought for a few seconds
+              </span>
             </div>
-            <span className="text-sm font-medium text-[#E5E5E0]">
-              Thinking Process
-            </span>
-            <span className="text-xs text-[#6B6B65] font-normal">
-              See how the model reasoned
-            </span>
-          </div>
-          {showReasoningPanel ? 
-            <ChevronUp size={18} className="text-[#6B6B65]" /> : 
-            <ChevronDown size={18} className="text-[#6B6B65]" />
-          }
-        </button>
-        
-        {showReasoningPanel && (
-          <div className="px-4 pb-4">
-            <div className="bg-[#222222] rounded-lg border border-[#2E2E2E] max-h-80 overflow-y-auto">
-              <div className="p-4 space-y-4">
-                {reasoningSections.map((section, idx) => (
-                  <div key={idx} className="space-y-2">
-                    {section.title && (
-                      <div className="flex items-start gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#CC785C] mt-2 flex-shrink-0" />
-                        <h4 className="text-sm font-medium text-[#E5E5E0] leading-relaxed">
-                          {section.title}
-                        </h4>
-                      </div>
-                    )}
-                    {section.content.length > 0 && (
-                      <div className="pl-3.5 space-y-1.5">
-                        {section.content.map((line, lineIdx) => (
-                          <p key={lineIdx} className="text-sm text-[#9B9B95] leading-relaxed">
-                            {line}
-                          </p>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+            {isExpanded ? 
+              <ChevronUp size={16} className="text-[#6B6B65] flex-shrink-0" /> : 
+              <ChevronDown size={16} className="text-[#6B6B65] flex-shrink-0" />
+            }
+          </button>
+          
+          {isExpanded && (
+            <div className="border-t border-[#3A3A3A] px-4 py-3 bg-[#252525]">
+              <div className="text-sm text-[#9B9B95] leading-relaxed whitespace-pre-wrap max-h-80 overflow-y-auto space-y-2">
+                {reasoning.split('\n').map((line, idx) => (
+                  line.trim() && <p key={idx}>{line}</p>
                 ))}
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     )
   }
@@ -872,7 +822,6 @@ Format as JSON with this structure:
           ) : lessonSteps.length > 0 ? (
             <>
               <LessonCard steps={lessonSteps} onComplete={handleLessonComplete} onCodeFeedback={handleCodeFeedback} />
-              <ReasoningPanel />
               <div className="border-t border-[#2E2E2E] bg-[#171717] p-3 md:p-4 flex-shrink-0">
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-medium text-[#6B6B65] uppercase">Ask a follow-up question</label>
@@ -1068,12 +1017,18 @@ Format as JSON with this structure:
                     </div>
                   </div>
                 ) : (
-                  <MessageBubble
-                    message={msg}
-                    onEdit={msg.role === "user" ? () => handleEditMessage(i) : undefined}
-                    onRegenerate={msg.role === "assistant" ? () => handleRegenerateResponse(i) : undefined}
-                    onThreadResponse={msg.role === "assistant" ? handleThreadResponse : undefined}
-                  />
+                  <>
+                    {/* Show reasoning panel BEFORE assistant's last message */}
+                    {msg.role === "assistant" && i === messages.length - 1 && currentReasoning && (
+                      <ReasoningPanel reasoning={currentReasoning} />
+                    )}
+                    <MessageBubble
+                      message={msg}
+                      onEdit={msg.role === "user" ? () => handleEditMessage(i) : undefined}
+                      onRegenerate={msg.role === "assistant" ? () => handleRegenerateResponse(i) : undefined}
+                      onThreadResponse={msg.role === "assistant" ? handleThreadResponse : undefined}
+                    />
+                  </>
                 )}
               </div>
             ))}
@@ -1105,8 +1060,6 @@ Format as JSON with this structure:
           </button>
         </div>
       )}
-
-      <ReasoningPanel />
 
       <div className="bg-[#1E1E1E] px-3 sm:px-4 pb-4 sm:pb-6 pt-3 sm:pt-4 flex-shrink-0">
         <div className="max-w-3xl mx-auto">
