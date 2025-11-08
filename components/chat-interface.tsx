@@ -2,7 +2,7 @@
 
 import type React from "react"
 import QuizMode from "./quiz-mode"
-import { FileText, X, ArrowUp, Brain, ChevronDown, ChevronUp } from "lucide-react"
+import { FileText, X, ArrowUp, Brain, ChevronDown, ChevronUp, Plus, Image as ImageIcon, FileUp, Sparkles } from "lucide-react"
 
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
@@ -100,6 +100,10 @@ export default function ChatInterface({
   const [showReasoningPanel, setShowReasoningPanel] = useState(false)
   const [currentReasoning, setCurrentReasoning] = useState<string | null>(null)
   
+  // Plus menu state
+  const [showPlusMenu, setShowPlusMenu] = useState(false)
+  const plusMenuRef = useRef<HTMLDivElement>(null)
+  
   const [fallbackInfo, setFallbackInfo] = useState<{
     originalModel: string;
     usedModel: string;
@@ -124,6 +128,20 @@ export default function ChatInterface({
       setCurrentTopic(currentStudySession.question)
     }
   }, [currentStudySession])
+
+  // Close plus menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (plusMenuRef.current && !plusMenuRef.current.contains(event.target as Node)) {
+        setShowPlusMenu(false)
+      }
+    }
+
+    if (showPlusMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => document.removeEventListener('mousedown', handleClickOutside)
+    }
+  }, [showPlusMenu])
 
   const scrollToBottom = (force = false) => {
     if (!messagesContainerRef.current || !messagesEndRef.current) return
@@ -220,6 +238,60 @@ export default function ChatInterface({
 
   const handlePdfImagesExtracted = (images: string[], fileName: string) => {
     setPdfImages(images)
+  }
+
+  const handleImageInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        setAttachedImage(event.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+    }
+  }
+
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const fileName = file.name
+    const fileExtension = fileName.split('.').pop()?.toLowerCase()
+
+    if (fileExtension === 'pdf') {
+      // Handle PDF files
+      try {
+        const arrayBuffer = await file.arrayBuffer()
+        const uint8Array = new Uint8Array(arrayBuffer)
+        
+        // For PDF, we'll extract images using the FileUpload component's logic
+        // For now, just read as text if possible or store the file info
+        const reader = new FileReader()
+        reader.onload = (event) => {
+          const content = event.target?.result as string
+          setAttachedFile({ content: fileName, name: fileName })
+          setFileContentSent(false)
+          if (!input.trim()) {
+            setInput("Analyze this document")
+          }
+        }
+        reader.readAsDataURL(file)
+      } catch (error) {
+        console.error('Error reading PDF:', error)
+      }
+    } else {
+      // Handle text files
+      const reader = new FileReader()
+      reader.onload = (event) => {
+        const content = event.target?.result as string
+        setAttachedFile({ content, name: fileName })
+        setFileContentSent(false)
+        if (!input.trim()) {
+          setInput("Analyze this document")
+        }
+      }
+      reader.readAsText(file)
+    }
   }
 
   const sendMessageToAPIWithFallback = async (
@@ -658,6 +730,97 @@ Format as JSON with this structure:
     selectedModel.includes("reasoning") ||
     selectedModel.includes("tongyi-deepresearch") ||
     selectedModel.includes("qwq")
+
+  // Refs for file inputs
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // Plus Menu Component
+  const PlusMenu = () => {
+    const handleImageClick = () => {
+      imageInputRef.current?.click()
+      setShowPlusMenu(false)
+    }
+
+    const handleFileClick = () => {
+      fileInputRef.current?.click()
+      setShowPlusMenu(false)
+    }
+
+    const handleThinkingToggle = () => {
+      setUseReasoning(!useReasoning)
+      setShowPlusMenu(false)
+    }
+
+    return (
+      <div className="relative" ref={plusMenuRef}>
+        <button
+          onClick={() => setShowPlusMenu(!showPlusMenu)}
+          className={`p-2 rounded-lg transition-all hover:bg-[#3A3A3A] ${showPlusMenu ? 'bg-[#3A3A3A]' : ''}`}
+          title="More options"
+        >
+          <Plus size={20} className="text-[#9B9B95]" />
+        </button>
+
+        {showPlusMenu && (
+          <div className="absolute bottom-full left-0 mb-2 w-56 bg-[#2A2A2A] border border-[#3A3A3A] rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200 z-50">
+            <div className="py-2">
+              <button
+                onClick={handleImageClick}
+                className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[#3A3A3A] transition-colors text-left group"
+              >
+                <div className="p-2 rounded-lg bg-[#3A3A3A] group-hover:bg-[#4A4A4A] transition-colors">
+                  <ImageIcon size={18} className="text-[#CC785C]" />
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-[#E5E5E0]">Add image</div>
+                  <div className="text-xs text-[#6B6B65]">Upload from device</div>
+                </div>
+              </button>
+
+              <button
+                onClick={handleFileClick}
+                className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[#3A3A3A] transition-colors text-left group"
+              >
+                <div className="p-2 rounded-lg bg-[#3A3A3A] group-hover:bg-[#4A4A4A] transition-colors">
+                  <FileUp size={18} className="text-[#CC785C]" />
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-[#E5E5E0]">Add file</div>
+                  <div className="text-xs text-[#6B6B65]">PDF, TXT, or other docs</div>
+                </div>
+              </button>
+
+              {supportsReasoning && (
+                <>
+                  <div className="h-px bg-[#3A3A3A] my-2"></div>
+                  <button
+                    onClick={handleThinkingToggle}
+                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[#3A3A3A] transition-colors text-left group"
+                  >
+                    <div className="p-2 rounded-lg bg-[#3A3A3A] group-hover:bg-[#4A4A4A] transition-colors">
+                      <Brain size={18} className="text-[#CC785C]" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-[#E5E5E0]">
+                        {useReasoning ? 'Disable' : 'Enable'} thinking
+                      </div>
+                      <div className="text-xs text-[#6B6B65]">
+                        {useReasoning ? 'Turn off reasoning' : 'Show thought process'}
+                      </div>
+                    </div>
+                    {useReasoning && (
+                      <Sparkles size={16} className="text-[#CC785C]" />
+                    )}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   // Reasoning Panel Component - Simple ChatGPT style
   const ReasoningPanel = ({ reasoning }: { reasoning: string }) => {
@@ -1117,13 +1280,25 @@ Format as JSON with this structure:
           
           <div className="relative bg-[#2A2A2A] rounded-2xl sm:rounded-3xl border border-[#3A3A3A] focus-within:border-[#4A4A4A] transition-colors shadow-lg">
             <div className="absolute left-3 sm:left-4 bottom-[14px] sm:bottom-4 flex items-center gap-1 z-10">
-              <ImageUpload onImageSelect={setAttachedImage} />
-              <FileUpload 
-                onFileSelect={handleFileSelect}
-                onImagesExtracted={handlePdfImagesExtracted}
-              />
+              <PlusMenu />
               <VoiceInput onTranscript={(text) => setInput((prev) => prev + text)} />
             </div>
+
+            {/* Hidden file inputs */}
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageInputChange}
+              className="hidden"
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.txt,.doc,.docx,.json,.csv,.md"
+              onChange={handleFileInputChange}
+              className="hidden"
+            />
 
             <Textarea
               ref={textareaRef}
@@ -1131,7 +1306,7 @@ Format as JSON with this structure:
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Type your message"
-              className="resize-none bg-transparent border-0 text-white placeholder-[#6B6B6B] focus:ring-0 rounded-2xl sm:rounded-3xl text-[15px] pl-[120px] sm:pl-32 pr-[60px] sm:pr-32 py-[18px] sm:py-5 w-full leading-6"
+              className="resize-none bg-transparent border-0 text-white placeholder-[#6B6B6B] focus:ring-0 rounded-2xl sm:rounded-3xl text-[15px] pl-[100px] sm:pl-28 pr-[60px] sm:pr-32 py-[18px] sm:py-5 w-full leading-6"
               rows={1}
               style={{ minHeight: '56px', maxHeight: '200px' }}
             />
