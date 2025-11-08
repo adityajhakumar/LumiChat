@@ -27,8 +27,18 @@ interface ChatInterfaceProps {
   currentStudySession?: any
 }
 
+// Type for fallback chains
+type FallbackChains = {
+  [key: string]: string[];
+}
+
 // Fallback configuration
-const MODEL_FALLBACK_CONFIG = {
+const MODEL_FALLBACK_CONFIG: {
+  fallbackChains: FallbackChains;
+  universalFallbacks: string[];
+  maxRetries: number;
+  retryDelay: number;
+} = {
   fallbackChains: {
     "google/gemini-2.0-flash-exp:free": [
       "qwen/qwen2.5-vl-32b-instruct:free",

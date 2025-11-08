@@ -5,6 +5,7 @@ import remarkGfm from "remark-gfm"
 import remarkMath from "remark-math"
 import rehypeKatex from "rehype-katex"
 import { Copy, RotateCw, ThumbsUp, ThumbsDown, Check, Edit2, MessageSquare, ChevronRight, X } from "lucide-react"
+import "katex/dist/katex.min.css" // Add this line!
 import { useState, useEffect, useRef } from "react"
 import { Textarea } from "@/components/ui/textarea"
 
