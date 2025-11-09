@@ -557,7 +557,7 @@ export default function ChatInterface({
 
     setLoading(false)
 
-    if (!result) {
+    if (!result)  {
       const errorMessage = {
         role: "assistant",
         content: `❌ **Unable to Generate Response**\n\n` +
@@ -797,7 +797,7 @@ Provide constructive feedback and suggestions for improvement.`
     const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel)
     setLoading(false)
     
-    if (!result) return
+    if (!result)  return
 
     if (result.data.reasoning) {
       setCurrentReasoning(result.data.reasoning)
@@ -844,7 +844,7 @@ Format as JSON with this structure:
     const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel)
     setLoading(false)
     
-    if (!result) return
+    if (!result)  return
 
     try {
       const jsonMatch = result.data.content.match(/\{[\s\S]*\}/)
