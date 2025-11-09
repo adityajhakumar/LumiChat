@@ -1014,8 +1014,383 @@ export default function ChatInterface({
       </div>
     )
   }
+    if (e.key === "Enter" && e.ctrlKey) handleSendMessage()
+  }
+
+  const handleFollowUpKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === "Enter" && e.ctrlKey) handleFollowUpQuestion()
+  }
+
+  const handleLessonComplete = () => {
+    setLessonSteps([])
+    setInput("")
+    onStudyModeComplete?.()
+  }
+
+  const handleQuizComplete = () => {
+    setQuizMode(false)
+    setQuizData(null)
+  }
+
+  // Check if current model supports reasoning
+  const supportsReasoning = 
+    selectedModel.includes("minimax") || 
+    selectedModel.includes("deepseek-r1") ||
+    selectedModel.includes("reasoning") ||
+    selectedModel.includes("tongyi-deepresearch") ||
+    selectedModel.includes("qwq")
+
+  // Plus Menu Component
+  const PlusMenu = () => {
+    const handleImageClick = () => {
+      imageInputRef.current?.click()
+      setShowPlusMenu(false)
+    }
+
+    const handleFileClick = () => {
+      fileInputRef.current?.click()
+      setShowPlusMenu(false)
+    }
+
+    const handleThinkingToggle = () => {
+      setUseReasoning(!useReasoning)
+      setShowPlusMenu(false)
+    }
+
+    return (
+      <div className="relative" ref={plusMenuRef}>
+        <button
+          onClick={() => setShowPlusMenu(!showPlusMenu)}
+          className={`p-2 rounded-lg transition-all hover:bg-[#3A3A3A] ${showPlusMenu ? 'bg-[#3A3A3A]' : ''}`}
+          title="More options"
+        >
+          <Plus size={20} className="text-[#9B9B95]" />
+        </button>
+
+        {showPlusMenu && (
+          <div className="absolute bottom-full left-0 mb-2 w-56 bg-[#2A2A2A] border border-[#3A3A3A] rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200 z-50">
+            <div className="py-2">
+              <button
+                onClick={handleImageClick}
+                className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[#3A3A3A] transition-colors text-left group"
+              >
+                <div className="p-2 rounded-lg bg-[#3A3A3A] group-hover:bg-[#4A4A4A] transition-colors">
+                  <ImageIcon size={18} className="text-[#CC785C]" />
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-[#E5E5E0]">Add image</div>
+                  <div className="text-xs text-[#6B6B65]">Upload from device</div>
+                </div>
+              </button>
+
+              <button
+                onClick={handleFileClick}
+                className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[#3A3A3A] transition-colors text-left group"
+              >
+                <div className="p-2 rounded-lg bg-[#3A3A3A] group-hover:bg-[#4A4A4A] transition-colors">
+                  <FileUp size={18} className="text-[#CC785C]" />
+                </div>
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-[#E5E5E0]">Add file</div>
+                  <div className="text-xs text-[#6B6B65]">PDF, TXT, or other docs</div>
+                </div>
+              </button>
+
+              {supportsReasoning && (
+                <>
+                  <div className="h-px bg-[#3A3A3A] my-2"></div>
+                  <button
+                    onClick={handleThinkingToggle}
+                    className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[#3A3A3A] transition-colors text-left group"
+                  >
+                    <div className="p-2 rounded-lg bg-[#3A3A3A] group-hover:bg-[#4A4A4A] transition-colors">
+                      <Brain size={18} className="text-[#CC785C]" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-sm font-medium text-[#E5E5E0]">
+                        {useReasoning ? 'Disable' : 'Enable'} thinking
+                      </div>
+                      <div className="text-xs text-[#6B6B65]">
+                        {useReasoning ? 'Turn off reasoning' : 'Show thought process'}
+                      </div>
+                    </div>
+                    {useReasoning && (
+                      <Sparkles size={16} className="text-[#CC785C]" />
+                    )}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Reasoning Panel Component - ChatGPT/Claude style
+  const ReasoningPanel = ({ reasoning }: { reasoning: string }) => {
+    const [isExpanded, setIsExpanded] = useState(false)
+
+    return (
+      <div className="mb-3">
+        <div className="bg-[#2A2A2A] rounded-lg border border-[#3A3A3A] overflow-hidden">
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-[#2E2E2E] transition-colors text-left"
+          >
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <Brain size={16} className="text-[#CC785C] flex-shrink-0" />
+              <span className="text-sm text-[#9B9B95]">
+                Thought for a few seconds
+              </span>
+            </div>
+            {isExpanded ? 
+              <ChevronUp size={16} className="text-[#6B6B65] flex-shrink-0" /> : 
+              <ChevronDown size={16} className="text-[#6B6B65] flex-shrink-0" />
+            }
+          </button>
+          
+          {isExpanded && (
+            <div className="border-t border-[#3A3A3A] px-4 py-3 bg-[#252525]">
+              <div className="text-sm text-[#9B9B95] leading-relaxed whitespace-pre-wrap max-h-80 overflow-y-auto space-y-2">
+                {reasoning.split('\n').map((line, idx) => (
+                  line.trim() && <p key={idx}>{line}</p>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // Reasoning Controls Component
+  const ReasoningControls = () => {
+    if (!supportsReasoning) return null
+
+    return (
+      <div className="mb-3 rounded-xl border border-[#2E2E2E] bg-[#1E1E1E] overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3">
+          <label className="flex items-center gap-3 cursor-pointer group">
+            <div className="relative">
+              <input
+                type="checkbox"
+                checked={useReasoning}
+                onChange={(e) => setUseReasoning(e.target.checked)}
+                className="peer sr-only"
+              />
+              <div className="w-11 h-6 bg-[#2A2A2A] rounded-full peer-checked:bg-[#CC785C] transition-all"></div>
+              <div className="absolute left-1 top-1 w-4 h-4 bg-white rounded-full transition-all peer-checked:translate-x-5"></div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Brain size={16} className="text-[#CC785C]" />
+              <span className="text-sm font-medium text-[#E5E5E0]">
+                Enhanced Reasoning
+              </span>
+            </div>
+          </label>
+
+          {useReasoning && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-[#6B6B65]">Effort:</span>
+              <select
+                value={reasoningEffort}
+                onChange={(e) => setReasoningEffort(e.target.value as "low" | "medium" | "high")}
+                className="px-3 py-1.5 rounded-lg bg-[#2A2A2A] border border-[#3A3A3A] text-sm text-[#E5E5E0] focus:border-[#CC785C] focus:ring-1 focus:ring-[#CC785C] transition-all"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+          )}
+        </div>
+        
+        {useReasoning && (
+          <div className="px-4 pb-3 text-xs text-[#6B6B65]">
+            The model will show its step-by-step thinking process
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Streaming indicator component
+  const StreamingIndicator = () => {
+    if (!isStreaming) return null
+    
+    return (
+      <div className="flex items-center gap-2 text-xs text-[#6B6B65] px-2 py-1">
+        <div className="flex space-x-1">
+          <div className="w-1.5 h-1.5 bg-[#CC785C] rounded-full animate-pulse"></div>
+          <div className="w-1.5 h-1.5 bg-[#CC785C] rounded-full animate-pulse delay-75"></div>
+          <div className="w-1.5 h-1.5 bg-[#CC785C] rounded-full animate-pulse delay-150"></div>
+        </div>
+        <span>Generating...</span>
+      </div>
+    )
+  }
 
   if (studyMode) {
+    return (
+      <div ref={containerRef} className="flex h-full bg-[#1E1E1E] text-white overflow-hidden">
+        {retryStatus.show && (
+          <div className="fixed top-20 right-4 bg-[#2A2A2A] border border-yellow-600/50 rounded-lg p-3 shadow-xl z-50 max-w-xs animate-in slide-in-from-right duration-200">
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0">
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-yellow-500 border-t-transparent"></div>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-yellow-400">
+                  Retrying... ({retryStatus.attemptNumber}/{retryStatus.totalAttempts})
+                </p>
+                <p className="text-xs text-[#9B9B95] truncate mt-0.5">
+                  Trying: {retryStatus.currentModel.split('/').pop()?.replace(':free', '')}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {fallbackInfo && (
+          <div className="fixed top-20 right-4 bg-[#2A2A2A] border border-[#CC785C] rounded-lg p-4 shadow-xl z-50 max-w-sm animate-in slide-in-from-right duration-300">
+            <div className="flex items-start gap-3">
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#CC785C]/20 flex items-center justify-center">
+                <svg className="w-5 h-5 text-[#CC785C]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h4 className="text-sm font-semibold text-[#E5E5E0] mb-1 flex items-center gap-2">
+                  <span>✓</span> Auto-Fallback Success
+                </h4>
+                <p className="text-xs text-[#9B9B95] mb-2">
+                  Primary model unavailable. Automatically switched to working alternative.
+                </p>
+                <div className="text-xs space-y-1.5 bg-[#1E1E1E] rounded p-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#6B6B65] w-16">Original:</span>
+                    <span className="text-red-400 font-mono text-[10px] truncate flex-1">
+                      {fallbackInfo.originalModel.split('/').pop()?.replace(':free', '')}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[#6B6B65] w-16">Using:</span>
+                    <span className="text-green-400 font-mono text-[10px] truncate flex-1">
+                      {fallbackInfo.usedModel.split('/').pop()?.replace(':free', '')}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1 border-t border-[#3A3A3A]">
+                    <span className="text-[#6B6B65]">
+                      Failed attempts: {fallbackInfo.attempts}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <button
+                onClick={() => setFallbackInfo(null)}
+                className="flex-shrink-0 text-[#6B6B65] hover:text-[#E5E5E0] transition-colors p-1"
+                title="Dismiss"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+
+        <div style={{ width: `${dividerPos}%` }} className="flex flex-col overflow-hidden border-r border-[#2E2E2E]">
+          {quizMode && quizData ? (
+            <QuizMode quizData={quizData} onComplete={handleQuizComplete} topic={currentTopic} />
+          ) : lessonSteps.length > 0 ? (
+            <>
+              <LessonCard steps={lessonSteps} onComplete={handleLessonComplete} onCodeFeedback={handleCodeFeedback} />
+              <div className="border-t border-[#2E2E2E] bg-[#171717] p-3 md:p-4 flex-shrink-0">
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-medium text-[#6B6B65] uppercase">Ask a follow-up question</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={followUpInput}
+                      onChange={(e) => setFollowUpInput(e.target.value)}
+                      onKeyDown={handleFollowUpKeyDown}
+                      placeholder="Ask about this concept..."
+                      className="flex-1 px-3 py-2 rounded-lg bg-[#222222] text-white placeholder-[#6B6B6B] border border-[#2E2E2E] focus:border-[#CC785C] focus:ring-1 focus:ring-[#CC785C] text-sm"
+                    />
+                    <button
+                      onClick={handleFollowUpQuestion}
+                      disabled={loading || !followUpInput.trim()}
+                      className="px-3 md:px-4 py-2 rounded-lg bg-[#CC785C] hover:bg-[#B8674A] text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium flex-shrink-0"
+                    >
+                      Ask
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-2">
+                <div className="flex items-center justify-center h-full text-center px-4">
+                  <div>
+                    <h3 className="text-xl md:text-2xl font-semibold mb-2">Start Learning</h3>
+                    <p className="text-sm md:text-base text-[#8C8C8C]">
+                      Ask a coding question to begin your interactive lesson
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <ReasoningControls />
+
+              <div className="border-t border-[#2E2E2E] bg-[#171717] p-3 md:p-6 flex-shrink-0">
+                <div className="flex flex-col md:flex-row gap-2 md:gap-3">
+                  <div className="flex-1">
+                    <Textarea
+                      ref={textareaRef}
+                      value={input}
+                      onChange={(e) => setInput(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      placeholder="Ask a coding question..."
+                      className="resize-none border-[#2E2E2E] bg-[#222222] text-white placeholder-[#6B6B6B] focus:ring-2 focus:ring-[#CC785C] rounded-lg text-sm md:text-base"
+                      rows={3}
+                    />
+                  </div>
+                  <Button
+                    onClick={handleSendMessage}
+                    disabled={loading || !input.trim()}
+                    className="bg-[#CC785C] hover:bg-[#B8674A] text-white rounded-lg px-4 md:px-6 py-2 md:py-3 h-auto md:self-end w-full md:w-auto"
+                  >
+                    Send
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <div
+          onMouseDown={() => setIsDragging(true)}
+          className="w-1 bg-[#2E2E2E] hover:bg-[#CC785C] cursor-col-resize transition-colors flex items-center justify-center group"
+        >
+          <GripVertical
+            size={16}
+            className="text-[#6B6B65] group-hover:text-[#CC785C] opacity-0 group-hover:opacity-100"
+          />
+        </div>
+
+        <div style={{ width: `${100 - dividerPos}%` }} className="flex flex-col overflow-hidden">
+          <CodeEditor
+            language={codeLanguage}
+            onLanguageChange={setCodeLanguage}
+            onCodeFeedback={handleCodeFeedback}
+            onStartQuiz={handleStartQuiz}
+          />
+        </div>
+      </div>
+    )
+  }
     return (
       <div ref={containerRef} className="flex h-full bg-[#1E1E1E] text-white overflow-hidden">
         {retryStatus.show && (
@@ -1434,6 +1809,263 @@ export default function ChatInterface({
     </div>
   )
 }
+    <div className="flex flex-col h-full bg-[#1E1E1E] text-white overflow-hidden">
+      {retryStatus.show && (
+        <div className="fixed top-20 right-4 bg-[#2A2A2A] border border-yellow-600/50 rounded-lg p-3 shadow-xl z-50 max-w-xs animate-in slide-in-from-right duration-200">
+          <div className="flex items-center gap-3">
+            <div className="flex-shrink-0">
+              <div className="animate-spin rounded-full h-5 w-5 border-2 border-yellow-500 border-t-transparent"></div>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-yellow-400">
+                Retrying... ({retryStatus.attemptNumber}/{retryStatus.totalAttempts})
+              </p>
+              <p className="text-xs text-[#9B9B95] truncate mt-0.5">
+                Trying: {retryStatus.currentModel.split('/').pop()?.replace(':free', '')}
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {fallbackInfo && (
+        <div className="fixed top-20 right-4 bg-[#2A2A2A] border border-[#CC785C] rounded-lg p-4 shadow-xl z-50 max-w-sm animate-in slide-in-from-right duration-300">
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#CC785C]/20 flex items-center justify-center">
+              <svg className="w-5 h-5 text-[#CC785C]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h4 className="text-sm font-semibold text-[#E5E5E0] mb-1 flex items-center gap-2">
+                <span>✓</span> Auto-Fallback Success
+              </h4>
+              <p className="text-xs text-[#9B9B95] mb-2">
+                Primary model unavailable. Automatically switched to working alternative.
+              </p>
+              <div className="text-xs space-y-1.5 bg-[#1E1E1E] rounded p-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-[#6B6B65] w-16">Original:</span>
+                  <span className="text-red-400 font-mono text-[10px] truncate flex-1">
+                    {fallbackInfo.originalModel.split('/').pop()?.replace(':free', '')}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[#6B6B65] w-16">Using:</span>
+                  <span className="text-green-400 font-mono text-[10px] truncate flex-1">
+                    {fallbackInfo.usedModel.split('/').pop()?.replace(':free', '')}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 pt-1 border-t border-[#3A3A3A]">
+                  <span className="text-[#6B6B65]">
+                    Failed attempts: {fallbackInfo.attempts}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => setFallbackInfo(null)}
+              className="flex-shrink-0 text-[#6B6B65] hover:text-[#E5E5E0] transition-colors p-1"
+              title="Dismiss"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div 
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto"
+      >
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-4 sm:py-6 space-y-2">
+        {messages.length === 0 ? (
+          <div className="flex items-center justify-center min-h-full text-center px-4">
+            <div className="flex flex-col items-center justify-center gap-2 md:gap-3">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-light text-[#CC785C] tracking-tight">LumiChat</h1>
+              <p className="text-sm sm:text-base md:text-lg text-[#9B9B95] font-light">Where your words matter</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {messages.map((msg, i) => (
+              <div key={i}>
+                {editingMessageIndex === i ? (
+                  <div className="mb-6 sm:mb-8">
+                    <div className="w-full">
+                      <Textarea
+                        value={editedContent}
+                        onChange={(e) => setEditedContent(e.target.value)}
+                        className="w-full min-h-[100px] bg-[#2A2A2A] border border-[#3A3A3A] text-white rounded-lg p-3"
+                      />
+                      <div className="flex gap-2 mt-2">
+                        <button
+                          onClick={handleSaveEdit}
+                          className="px-4 py-2 bg-[#CC785C] hover:bg-[#B8674A] text-white rounded-lg text-sm"
+                        >
+                          Save & Submit
+                        </button>
+                        <button
+                          onClick={handleCancelEdit}
+                          className="px-4 py-2 bg-[#2A2A2A] hover:bg-[#3A3A3A] text-white rounded-lg text-sm"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {msg.role === "assistant" && i === messages.length - 1 && currentReasoning && (
+                      <ReasoningPanel reasoning={currentReasoning} />
+                    )}
+                    <MessageBubble
+                      message={msg}
+                      onEdit={msg.role === "user" ? () => handleEditMessage(i) : undefined}
+                      onRegenerate={msg.role === "assistant" ? () => handleRegenerateResponse(i) : undefined}
+                      onThreadResponse={msg.role === "assistant" ? handleThreadResponse : undefined}
+                    />
+                  </>
+                )}
+              </div>
+            ))}
+            {loading && (
+              <div className="mb-4">
+                <div className="bg-[#2A2A2A] rounded-xl px-4 py-3 inline-block">
+                  <StreamingIndicator />
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </>
+        )}
+        </div>
+      </div>
+
+      {userScrolled && !isStreaming && (
+        <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 z-10">
+          <button
+            onClick={() => scrollToBottom(true)}
+            className="bg-[#2A2A2A] hover:bg-[#3A3A3A] border border-[#3A3A3A] text-white rounded-full p-2 shadow-lg transition-all"
+            title="Scroll to bottom"
+          >
+            <ArrowUp className="rotate-180" size={20} />
+          </button>
+        </div>
+      )}
+
+      <div className="bg-[#1E1E1E] px-3 sm:px-4 pb-4 sm:pb-6 pt-3 sm:pt-4 flex-shrink-0">
+        <div className="max-w-3xl mx-auto">
+          <ReasoningControls />
+
+          <div className="sm:hidden mb-3">
+            <ModelSelector 
+              selectedModel={selectedModel} 
+              onModelChange={onModelChange}
+              hasImage={!!attachedImage}
+            />
+          </div>
+
+          {attachedImage && (
+            <div className="mb-2 sm:mb-3 relative inline-block">
+              <img
+                src={attachedImage || "/placeholder.svg"}
+                alt="Attached"
+                className="h-16 sm:h-20 rounded-lg border border-[#3A3A3A] object-cover"
+              />
+              <button
+                onClick={() => setAttachedImage(null)}
+                className="absolute -top-2 -right-2 bg-[#D65D5D] text-white rounded-full w-5 h-5 flex items-center justify-center hover:bg-red-700 transition text-xs"
+              >
+                ✕
+              </button>
+            </div>
+          )}
+          {attachedFile && (
+            <div className="mb-2 sm:mb-3 p-2 sm:p-3 rounded-lg bg-[#2A2A2A] border border-[#3A3A3A] flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText size={16} className="text-[#CC785C] flex-shrink-0" />
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs sm:text-sm text-white truncate">{attachedFile.name}</span>
+                  {pdfImages.length > 0 && (
+                    <span className="text-xs text-[#6B6B65]">{pdfImages.length} pages extracted</span>
+                  )}
+                  {fileContentSent && (
+                    <span className="text-xs text-green-500">✓ Context maintained</span>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setAttachedFile(null)
+                  setPdfImages([])
+                  setFileContentSent(false)
+                }}
+                className="ml-2 text-[#6B6B65] hover:text-[#D65D5D] transition flex-shrink-0"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          )}
+          
+          <div className="relative bg-[#2A2A2A] rounded-2xl sm:rounded-3xl border border-[#3A3A3A] focus-within:border-[#4A4A4A] transition-colors shadow-lg">
+            <div className="absolute left-3 sm:left-4 bottom-[14px] sm:bottom-4 flex items-center gap-1 z-10">
+              <PlusMenu />
+              <VoiceInput onTranscript={(text) => setInput((prev) => prev + text)} />
+            </div>
+
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageInputChange}
+              className="hidden"
+            />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.txt,.doc,.docx,.json,.csv,.md"
+              onChange={handleFileInputChange}
+              className="hidden"
+            />
+
+            <Textarea
+              ref={textareaRef}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Type your message"
+              className="resize-none bg-transparent border-0 text-white placeholder-[#6B6B6B] focus:ring-0 rounded-2xl sm:rounded-3xl text-[15px] pl-[100px] sm:pl-28 pr-[60px] sm:pr-32 py-[18px] sm:py-5 w-full leading-6"
+              rows={1}
+              style={{ minHeight: '56px', maxHeight: '200px' }}
+            />
+            
+            <div className="absolute right-3 sm:right-4 bottom-[14px] sm:bottom-4 flex items-center gap-2">
+              <div className="hidden sm:block">
+                <ModelSelector 
+                  selectedModel={selectedModel} 
+                  onModelChange={onModelChange}
+                  hasImage={!!attachedImage}
+                />
+              </div>
+              
+              <button
+                onClick={handleSendMessage}
+                disabled={loading || (!input.trim() && !attachedImage && !attachedFile)}
+                className="bg-[#CC785C] hover:bg-[#D68770] disabled:bg-[#6B6B65] disabled:cursor-not-allowed text-white rounded-lg sm:rounded-xl p-2 transition-all flex items-center justify-center flex-shrink-0"
+                title="Send message"
+              >
+                <ArrowUp size={20} strokeWidth={2.5} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
     
     if (!result || !result.data) return
 
@@ -1451,6 +2083,95 @@ export default function ChatInterface({
   }
 
   const handleCodeFeedback = async (code: string) => {
+    if (!code.trim()) return
+
+    const feedbackPrompt = `Please review this code and provide feedback on:
+1. Correctness - Does it solve the problem?
+2. Efficiency - Can it be optimized?
+3. Style - Is it readable and well-structured?
+4. Best Practices - Does it follow coding conventions?
+
+Code to review:
+\`\`\`
+${code}
+\`\`\`
+
+Provide constructive feedback and suggestions for improvement.`
+
+    const userMessage = { role: "user", content: feedbackPrompt }
+    const newMessages = [...messages, userMessage]
+    setFollowUpInput("")
+    setLoading(true)
+
+    const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel)
+    setLoading(false)
+    
+    if (!result || !result.data) return
+
+    const { data } = result
+
+    if (data.reasoning) {
+      setCurrentReasoning(data.reasoning)
+      setShowReasoningPanel(true)
+    }
+
+    if (data.lessonSteps) {
+      setLessonSteps(data.lessonSteps)
+    }
+    onTokenCountChange(data.tokenCount || 0)
+  }
+
+  const handleStartQuiz = async (numQuestions: number) => {
+    const lessonContent = lessonSteps.map((step) => `${step.title}: ${step.content}`).join("\n\n")
+
+    const quizPrompt = `Based on the following lesson about "${currentTopic}", generate ${numQuestions} multiple choice questions to test understanding.
+
+Lesson Content:
+${lessonContent}
+
+For each question, provide:
+1. The question text (specific to the concepts taught)
+2. Four options (A, B, C, D)
+3. The correct answer (0-3 for option index)
+4. A brief explanation of why the answer is correct
+
+Format as JSON with this structure:
+{
+  "questions": [
+    {
+      "id": 1,
+      "question": "...",
+      "options": ["A) ...", "B) ...", "C) ...", "D) ..."],
+      "correct": 0,
+      "explanation": "..."
+    }
+  ]
+}`
+
+    const userMessage = { role: "user", content: quizPrompt }
+    const newMessages = [...messages, userMessage]
+    setLoading(true)
+
+    const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel)
+    setLoading(false)
+    
+    if (!result || !result.data) return
+
+    const { data } = result
+
+    try {
+      const jsonMatch = data.content.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        const parsedQuiz = JSON.parse(jsonMatch[0])
+        setQuizData(parsedQuiz)
+        setQuizMode(true)
+      }
+    } catch (e) {
+      console.error("Failed to parse quiz data:", e)
+    }
+
+    onTokenCountChange(data.tokenCount || 0)
+  }
     if (!code.trim()) return
 
     const feedbackPrompt = `Please review this code and provide feedback on:
