@@ -31,6 +31,18 @@ type FallbackChains = {
   [key: string]: string[];
 }
 
+interface APIResult {
+  data: {
+    content: string;
+    reasoning?: string;
+    lessonSteps?: any[];
+    tokenCount?: number;
+  };
+  usedModel: string;
+  fallbackUsed: boolean;
+  totalAttempts: number;
+}
+
 const MODEL_FALLBACK_CONFIG: {
   fallbackChains: FallbackChains;
   universalFallbacks: string[];
@@ -94,6 +106,9 @@ export default function ChatInterface({
   const [editedContent, setEditedContent] = useState("")
   const [userScrolled, setUserScrolled] = useState(false)
   
+  // Streaming state
+  const [isStreaming, setIsStreaming] = useState(false)
+  
   // Reasoning states
   const [useReasoning, setUseReasoning] = useState(false)
   const [reasoningEffort, setReasoningEffort] = useState<"low" | "medium" | "high">("medium")
@@ -151,8 +166,8 @@ export default function ChatInterface({
     const container = messagesContainerRef.current
     const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
     
-    if (force || isNearBottom) {
-      messagesEndRef.current.scrollIntoView({ behavior: "auto", block: "end" })
+    if (force || isNearBottom || isStreaming) {
+      messagesEndRef.current.scrollIntoView({ behavior: "smooth", block: "end" })
       setUserScrolled(false)
     }
   }
@@ -163,7 +178,7 @@ export default function ChatInterface({
 
     const handleScroll = () => {
       const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
-      if (!isAtBottom && !userScrolled) {
+      if (!isAtBottom && !userScrolled && !isStreaming) {
         setUserScrolled(true)
       } else if (isAtBottom && userScrolled) {
         setUserScrolled(false)
@@ -174,14 +189,14 @@ export default function ChatInterface({
     return () => {
       container.removeEventListener("scroll", handleScroll)
     }
-  }, [userScrolled])
+  }, [userScrolled, isStreaming])
 
   useEffect(() => {
-    if (messages.length > 0 && !userScrolled) {
+    if (messages.length > 0 && (!userScrolled || isStreaming)) {
       const timeoutId = setTimeout(() => scrollToBottom(true), 50)
       return () => clearTimeout(timeoutId)
     }
-  }, [messages.length, userScrolled])
+  }, [messages.length, userScrolled, isStreaming])
 
   useEffect(() => {
     const handlePaste = (event: ClipboardEvent) => {
@@ -390,7 +405,7 @@ export default function ChatInterface({
     includeFileContent = false,
     primaryModel: string,
     onStreamChunk?: (content: string) => void
-  ) => {
+  ): Promise<APIResult | null> => {
     const fallbackChain = MODEL_FALLBACK_CONFIG.fallbackChains[primaryModel] 
       || MODEL_FALLBACK_CONFIG.universalFallbacks;
     
@@ -527,6 +542,7 @@ export default function ChatInterface({
 
     setTimeout(() => scrollToBottom(true), 50)
     setLoading(true)
+    setIsStreaming(true)
 
     // Add streaming assistant message placeholder
     const streamingMessage = { role: "assistant", content: "" }
@@ -535,16 +551,14 @@ export default function ChatInterface({
       onMessagesChange(messagesWithStreaming)
     }
 
-    // Stream handler
+    // Stream handler with smooth scrolling
     const handleChunk = (content: string) => {
       if (!studyMode) {
         messagesWithStreaming[messagesWithStreaming.length - 1].content += content
         onMessagesChange([...messagesWithStreaming])
         
-        // Auto-scroll during streaming if near bottom
-        if (!userScrolled) {
-          setTimeout(() => scrollToBottom(), 10)
-        }
+        // Auto-scroll during streaming
+        setTimeout(() => scrollToBottom(), 10)
       }
     }
 
@@ -556,8 +570,9 @@ export default function ChatInterface({
     )
 
     setLoading(false)
+    setIsStreaming(false)
 
-    if (!result) {
+    if (!result || !result.data) {
       const errorMessage = {
         role: "assistant",
         content: `❌ **Unable to Generate Response**\n\n` +
@@ -637,6 +652,7 @@ export default function ChatInterface({
     setEditingMessageIndex(null)
     setEditedContent("")
     setLoading(true)
+    setIsStreaming(true)
 
     // Add streaming assistant message placeholder
     const streamingMessage = { role: "assistant", content: "" }
@@ -648,22 +664,23 @@ export default function ChatInterface({
       messagesWithStreaming[messagesWithStreaming.length - 1].content += content
       onMessagesChange([...messagesWithStreaming])
       
-      if (!userScrolled) {
-        setTimeout(() => scrollToBottom(), 10)
-      }
+      setTimeout(() => scrollToBottom(), 10)
     }
     
     const result = await sendMessageToAPIWithFallback(messagesToKeep, false, selectedModel, handleChunk)
     setLoading(false)
+    setIsStreaming(false)
     
-    if (!result) return
+    if (!result || !result.data) return
 
-    if (result.data.reasoning) {
-      setCurrentReasoning(result.data.reasoning)
+    const { data } = result
+
+    if (data.reasoning) {
+      setCurrentReasoning(data.reasoning)
       setShowReasoningPanel(true)
     }
     
-    onTokenCountChange(result.data.tokenCount || 0)
+    onTokenCountChange(data.tokenCount || 0)
     setTimeout(() => scrollToBottom(true), 50)
   }
 
@@ -676,6 +693,7 @@ export default function ChatInterface({
     const messagesToKeep = messages.slice(0, index)
     onMessagesChange(messagesToKeep)
     setLoading(true)
+    setIsStreaming(true)
 
     // Add streaming assistant message placeholder
     const streamingMessage = { role: "assistant", content: "" }
@@ -687,22 +705,23 @@ export default function ChatInterface({
       messagesWithStreaming[messagesWithStreaming.length - 1].content += content
       onMessagesChange([...messagesWithStreaming])
       
-      if (!userScrolled) {
-        setTimeout(() => scrollToBottom(), 10)
-      }
+      setTimeout(() => scrollToBottom(), 10)
     }
     
     const result = await sendMessageToAPIWithFallback(messagesToKeep, false, selectedModel, handleChunk)
     setLoading(false)
+    setIsStreaming(false)
     
-    if (!result) return
+    if (!result || !result.data) return
 
-    if (result.data.reasoning) {
-      setCurrentReasoning(result.data.reasoning)
+    const { data } = result
+
+    if (data.reasoning) {
+      setCurrentReasoning(data.reasoning)
       setShowReasoningPanel(true)
     }
     
-    onTokenCountChange(result.data.tokenCount || 0)
+    onTokenCountChange(data.tokenCount || 0)
     setTimeout(() => scrollToBottom(true), 50)
   }
 
@@ -760,94 +779,12 @@ export default function ChatInterface({
     const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel)
     setLoading(false)
     
-    if (!result) return
+    if (!result || !result.data) return
 
-    if (result.data.reasoning) {
-      setCurrentReasoning(result.data.reasoning)
-      setShowReasoningPanel(true)
-    }
-
-    if (result.data.lessonSteps) {
-      setLessonSteps(result.data.lessonSteps)
-    }
-    onTokenCountChange(result.data.tokenCount || 0)
-  }
-
-  const handleCodeFeedback = async (code: string) => {
-    if (!code.trim()) return
-
-    const feedbackPrompt = `Please review this code and provide feedback on:
-1. Correctness - Does it solve the problem?
-2. Efficiency - Can it be optimized?
-3. Style - Is it readable and well-structured?
-4. Best Practices - Does it follow coding conventions?
-
-Code to review:
-\`\`\`
-${code}
-\`\`\`
-
-Provide constructive feedback and suggestions for improvement.`
-
-    const userMessage = { role: "user", content: feedbackPrompt }
-    const newMessages = [...messages, userMessage]
-    setFollowUpInput("")
-    setLoading(true)
-
-    const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel)
-    setLoading(false)
-    
-    if (!result) return
-
-    if (result.data.reasoning) {
-      setCurrentReasoning(result.data.reasoning)
-      setShowReasoningPanel(true)
-    }
-
-    if (result.data.lessonSteps) {
-      setLessonSteps(result.data.lessonSteps)
-    }
-    onTokenCountChange(result.data.tokenCount || 0)
-  }
-
-  const handleStartQuiz = async (numQuestions: number) => {
-    const lessonContent = lessonSteps.map((step) => `${step.title}: ${step.content}`).join("\n\n")
-
-    const quizPrompt = `Based on the following lesson about "${currentTopic}", generate ${numQuestions} multiple choice questions to test understanding.
-
-Lesson Content:
-${lessonContent}
-
-For each question, provide:
-1. The question text (specific to the concepts taught)
-2. Four options (A, B, C, D)
-3. The correct answer (0-3 for option index)
-4. A brief explanation of why the answer is correct
-
-Format as JSON with this structure:
-{
-  "questions": [
-    {
-      "id": 1,
-      "question": "...",
-      "options": ["A) ...", "B) ...", "C) ...", "D) ..."],
-      "correct": 0,
-      "explanation": "..."
-    }
-  ]
-}`
-
-    const userMessage = { role: "user", content: quizPrompt }
-    const newMessages = [...messages, userMessage]
-    setLoading(true)
-
-    const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel)
-    setLoading(false)
-    
-    if (!result) return
+    const { data } = result
 
     try {
-      const jsonMatch = result.data.content.match(/\{[\s\S]*\}/)
+      const jsonMatch = data.content.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
         const parsedQuiz = JSON.parse(jsonMatch[0])
         setQuizData(parsedQuiz)
@@ -857,7 +794,7 @@ Format as JSON with this structure:
       console.error("Failed to parse quiz data:", e)
     }
 
-    onTokenCountChange(result.data.tokenCount || 0)
+    onTokenCountChange(data.tokenCount || 0)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -974,7 +911,7 @@ Format as JSON with this structure:
     )
   }
 
-  // Reasoning Panel Component - Simple ChatGPT style
+  // Reasoning Panel Component - ChatGPT/Claude style
   const ReasoningPanel = ({ reasoning }: { reasoning: string }) => {
     const [isExpanded, setIsExpanded] = useState(false)
 
@@ -1058,6 +995,22 @@ Format as JSON with this structure:
             The model will show its step-by-step thinking process
           </div>
         )}
+      </div>
+    )
+  }
+
+  // Streaming indicator component
+  const StreamingIndicator = () => {
+    if (!isStreaming) return null
+    
+    return (
+      <div className="flex items-center gap-2 text-xs text-[#6B6B65] px-2 py-1">
+        <div className="flex space-x-1">
+          <div className="w-1.5 h-1.5 bg-[#CC785C] rounded-full animate-pulse"></div>
+          <div className="w-1.5 h-1.5 bg-[#CC785C] rounded-full animate-pulse delay-75"></div>
+          <div className="w-1.5 h-1.5 bg-[#CC785C] rounded-full animate-pulse delay-150"></div>
+        </div>
+        <span>Generating...</span>
       </div>
     )
   }
@@ -1349,11 +1302,7 @@ Format as JSON with this structure:
             {loading && (
               <div className="mb-4">
                 <div className="bg-[#2A2A2A] rounded-xl px-4 py-3 inline-block">
-                  <div className="flex space-x-2">
-                    <div className="w-2 h-2 bg-[#6B6B6B] rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-[#6B6B6B] rounded-full animate-bounce delay-100"></div>
-                    <div className="w-2 h-2 bg-[#6B6B6B] rounded-full animate-bounce delay-200"></div>
-                  </div>
+                  <StreamingIndicator />
                 </div>
               </div>
             )}
@@ -1363,7 +1312,7 @@ Format as JSON with this structure:
         </div>
       </div>
 
-      {userScrolled && (
+      {userScrolled && !isStreaming && (
         <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 z-10">
           <button
             onClick={() => scrollToBottom(true)}
@@ -1485,3 +1434,91 @@ Format as JSON with this structure:
     </div>
   )
 }
+    
+    if (!result || !result.data) return
+
+    const { data } = result
+
+    if (data.reasoning) {
+      setCurrentReasoning(data.reasoning)
+      setShowReasoningPanel(true)
+    }
+
+    if (data.lessonSteps) {
+      setLessonSteps(data.lessonSteps)
+    }
+    onTokenCountChange(data.tokenCount || 0)
+  }
+
+  const handleCodeFeedback = async (code: string) => {
+    if (!code.trim()) return
+
+    const feedbackPrompt = `Please review this code and provide feedback on:
+1. Correctness - Does it solve the problem?
+2. Efficiency - Can it be optimized?
+3. Style - Is it readable and well-structured?
+4. Best Practices - Does it follow coding conventions?
+
+Code to review:
+\`\`\`
+${code}
+\`\`\`
+
+Provide constructive feedback and suggestions for improvement.`
+
+    const userMessage = { role: "user", content: feedbackPrompt }
+    const newMessages = [...messages, userMessage]
+    setFollowUpInput("")
+    setLoading(true)
+
+    const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel)
+    setLoading(false)
+    
+    if (!result || !result.data) return
+
+    const { data } = result
+
+    if (data.reasoning) {
+      setCurrentReasoning(data.reasoning)
+      setShowReasoningPanel(true)
+    }
+
+    if (data.lessonSteps) {
+      setLessonSteps(data.lessonSteps)
+    }
+    onTokenCountChange(data.tokenCount || 0)
+  }
+
+  const handleStartQuiz = async (numQuestions: number) => {
+    const lessonContent = lessonSteps.map((step) => `${step.title}: ${step.content}`).join("\n\n")
+
+    const quizPrompt = `Based on the following lesson about "${currentTopic}", generate ${numQuestions} multiple choice questions to test understanding.
+
+Lesson Content:
+${lessonContent}
+
+For each question, provide:
+1. The question text (specific to the concepts taught)
+2. Four options (A, B, C, D)
+3. The correct answer (0-3 for option index)
+4. A brief explanation of why the answer is correct
+
+Format as JSON with this structure:
+{
+  "questions": [
+    {
+      "id": 1,
+      "question": "...",
+      "options": ["A) ...", "B) ...", "C) ...", "D) ..."],
+      "correct": 0,
+      "explanation": "..."
+    }
+  ]
+}`
+
+    const userMessage = { role: "user", content: quizPrompt }
+    const newMessages = [...messages, userMessage]
+    setLoading(true)
+
+    const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel)
+    setLoading(false)
