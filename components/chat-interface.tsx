@@ -553,7 +553,7 @@ export default function ChatInterface({
       shouldIncludeFile,
       selectedModel,
       handleChunk
-    )
+    ) as any
 
     setLoading(false)
 
@@ -657,7 +657,7 @@ export default function ChatInterface({
       }
     }
     
-    const result = await sendMessageToAPIWithFallback(messagesToKeep, false, selectedModel, handleChunk)
+    const result = await sendMessageToAPIWithFallback(messagesToKeep, false, selectedModel, handleChunk) as any
     setLoading(false)
     
     if (!result) return
@@ -698,7 +698,7 @@ export default function ChatInterface({
       }
     }
     
-    const result = await sendMessageToAPIWithFallback(messagesToKeep, false, selectedModel, handleChunk)
+    const result = await sendMessageToAPIWithFallback(messagesToKeep, false, selectedModel, handleChunk) as any
     setLoading(false)
     
     if (!result) return
@@ -765,7 +765,7 @@ export default function ChatInterface({
     setFollowUpInput("")
     setLoading(true)
 
-    const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel)
+    const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel) as any
     setLoading(false)
     
     if (!result) return
@@ -804,7 +804,7 @@ Provide constructive feedback and suggestions for improvement.`
     setFollowUpInput("")
     setLoading(true)
 
-    const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel)
+    const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel) as any
     setLoading(false)
     
     if (!result)  return
@@ -853,7 +853,7 @@ Format as JSON with this structure:
     const newMessages = [...messages, userMessage]
     setLoading(true)
 
-    const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel)
+    const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel) as any
     setLoading(false)
     
     if (!result)  return
