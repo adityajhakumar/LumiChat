@@ -1,4 +1,4 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { type NextRequest } from "next/server"
 
 const API_KEYS = [
   process.env.OPENROUTER_API_KEY_1,
@@ -9,19 +9,9 @@ const API_KEYS = [
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-function extractCodeFromMarkdown(text: string): string {
-  const codeBlockMatch = text.match(/```(?:\w+)?\n([\s\S]*?)```/)
-  if (codeBlockMatch) {
-    return codeBlockMatch[1].trim()
-  }
-  return text
-}
-
 function parseStudyModeResponse(content: string): any[] {
   const lessonSteps: any[] = []
-
   const sections = content.split(/^##\s+/m).filter((s) => s.trim())
-
   const stepTitles = [
     "Understanding the Problem",
     "Building Intuition",
@@ -32,26 +22,20 @@ function parseStudyModeResponse(content: string): any[] {
 
   sections.forEach((section, index) => {
     if (index >= 5) return
-
     const lines = section.trim().split("\n")
     const firstLine = lines[0] || ""
     const title = firstLine.replace(/^\d+\.\s/, "").trim() || stepTitles[index] || `Step ${index + 1}`
-
     const contentLines = firstLine.includes(".") ? lines.slice(1) : lines.slice(1)
     let fullContent = contentLines.join("\n").trim()
 
     let type = "explanation"
-
     if (fullContent.includes("```")) {
       type = "code"
       const codeMatch = fullContent.match(/```(?:\w+)?\n([\s\S]*?)```/)
       if (codeMatch) {
         fullContent = codeMatch[1].trim()
       } else {
-        fullContent = fullContent
-          .replace(/```(\w+)?\n/g, "")
-          .replace(/```$/g, "")
-          .trim()
+        fullContent = fullContent.replace(/```(\w+)?\n/g, "").replace(/```$/g, "").trim()
       }
     } else if (fullContent.match(/\?|quiz|practice|challenge|question/i)) {
       type = "quiz"
@@ -60,20 +44,12 @@ function parseStudyModeResponse(content: string): any[] {
     }
 
     if (fullContent) {
-      lessonSteps.push({
-        title: title || stepTitles[index],
-        content: fullContent,
-        type,
-      })
+      lessonSteps.push({ title: title || stepTitles[index], content: fullContent, type })
     }
   })
 
   if (lessonSteps.length === 0) {
-    lessonSteps.push({
-      title: "Complete Lesson",
-      content: content,
-      type: "explanation",
-    })
+    lessonSteps.push({ title: "Complete Lesson", content: content, type: "explanation" })
   }
 
   return lessonSteps
@@ -91,11 +67,15 @@ export async function POST(request: NextRequest) {
       studyMode, 
       skillLevel = "beginner",
       useReasoning = false,
-      reasoningEffort = "medium"
+      reasoningEffort = "medium",
+      stream = true  // Enable streaming by default
     } = await request.json()
 
     if (!messages || !model) {
-      return NextResponse.json({ error: "Missing messages or model" }, { status: 400 })
+      return new Response(
+        JSON.stringify({ error: "Missing messages or model" }), 
+        { status: 400, headers: { "Content-Type": "application/json" } }
+      )
     }
 
     const formattedMessages = messages.map((msg: any, index: number) => {
@@ -107,31 +87,20 @@ export async function POST(request: NextRequest) {
             const fileContext = fileName 
               ? `\n\n[File: ${fileName}]\n${fileContent}\n[End of file content]\n\n`
               : `\n\n[Uploaded content]\n${fileContent}\n[End of content]\n\n`
-            
-            contentParts.push({ 
-              type: "text", 
-              text: fileContext + msg.content 
-            })
+            contentParts.push({ type: "text", text: fileContext + msg.content })
           } else {
             contentParts.push({ type: "text", text: msg.content })
           }
           
           if (image) {
-            contentParts.push({
-              type: "image_url",
-              image_url: { url: image },
-            })
+            contentParts.push({ type: "image_url", image_url: { url: image } })
           }
           
           if (images && Array.isArray(images) && images.length > 0) {
             const imagesToSend = images.slice(0, 5)
             imagesToSend.forEach((img: string) => {
-              contentParts.push({
-                type: "image_url",
-                image_url: { url: img },
-              })
+              contentParts.push({ type: "image_url", image_url: { url: img } })
             })
-            
             if (images.length > 5) {
               contentParts[0].text += `\n\n[Note: Showing first 5 of ${images.length} PDF pages]`
             }
@@ -145,12 +114,10 @@ export async function POST(request: NextRequest) {
           content: contentParts.length > 1 ? contentParts : contentParts[0].text,
         }
       }
-      
       return msg
     })
 
     let systemPrompt = ""
-
     if (studyMode) {
       const adaptiveGuidance =
         skillLevel === "beginner"
@@ -239,9 +206,9 @@ Keep responses clear, polite, and engaging.`
           messages: [{ role: "system", content: systemPrompt }, ...formattedMessages],
           temperature: 0.7,
           max_tokens: 15000,
+          stream: stream,
         }
 
-        // Add reasoning configuration if enabled
         if (useReasoning) {
           requestBody.reasoning = {
             effort: reasoningEffort,
@@ -265,6 +232,88 @@ Keep responses clear, polite, and engaging.`
           continue
         }
 
+        // If streaming is enabled, return the stream
+        if (stream && response.body) {
+          const encoder = new TextEncoder()
+          const decoder = new TextDecoder()
+          
+          let fullContent = ""
+          let reasoning = ""
+          
+          const transformStream = new TransformStream({
+            async transform(chunk, controller) {
+              const text = decoder.decode(chunk, { stream: true })
+              const lines = text.split('\n').filter(line => line.trim() !== '')
+              
+              for (const line of lines) {
+                if (line.startsWith(':')) {
+                  // OpenRouter processing comment - pass through
+                  controller.enqueue(encoder.encode(line + '\n\n'))
+                  continue
+                }
+                
+                if (line.startsWith('data: ')) {
+                  const data = line.slice(6)
+                  if (data === '[DONE]') {
+                    // Send final metadata
+                    const finalData = {
+                      done: true,
+                      fullContent,
+                      reasoning: reasoning || null,
+                      lessonSteps: studyMode ? parseStudyModeResponse(fullContent) : undefined
+                    }
+                    controller.enqueue(encoder.encode(`data: ${JSON.stringify(finalData)}\n\n`))
+                    controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+                    return
+                  }
+                  
+                  try {
+                    const parsed = JSON.parse(data)
+                    
+                    // Check for mid-stream error
+                    if (parsed.error) {
+                      controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: parsed.error })}\n\n`))
+                      controller.enqueue(encoder.encode('data: [DONE]\n\n'))
+                      return
+                    }
+                    
+                    const content = parsed.choices?.[0]?.delta?.content
+                    if (content) {
+                      fullContent += content
+                      controller.enqueue(encoder.encode(`data: ${data}\n\n`))
+                    }
+                    
+                    // Capture reasoning if present
+                    const reasoningChunk = parsed.choices?.[0]?.delta?.reasoning
+                    if (reasoningChunk) {
+                      reasoning += reasoningChunk
+                      controller.enqueue(encoder.encode(`data: ${data}\n\n`))
+                    }
+                    
+                    // Check for finish reason
+                    if (parsed.choices?.[0]?.finish_reason) {
+                      controller.enqueue(encoder.encode(`data: ${data}\n\n`))
+                    }
+                  } catch (e) {
+                    // Invalid JSON, skip
+                  }
+                }
+              }
+            }
+          })
+
+          const stream = response.body.pipeThrough(transformStream)
+          
+          return new Response(stream, {
+            headers: {
+              'Content-Type': 'text/event-stream',
+              'Cache-Control': 'no-cache',
+              'Connection': 'keep-alive',
+            },
+          })
+        }
+
+        // Non-streaming fallback
         const data = await response.json()
         const content = data.choices[0]?.message?.content || ""
         const reasoning = data.choices[0]?.message?.reasoning || null
@@ -275,25 +324,25 @@ Keep responses clear, polite, and engaging.`
           lessonSteps = parseStudyModeResponse(content)
         }
 
-        return NextResponse.json({
-          content,
-          reasoning,
-          tokenCount,
-          lessonSteps,
-        })
+        return new Response(
+          JSON.stringify({ content, reasoning, tokenCount, lessonSteps }),
+          { headers: { "Content-Type": "application/json" } }
+        )
       } catch (error) {
         lastError = error
         continue
       }
     }
 
-    return NextResponse.json({ 
-      error: lastError?.message || "All API keys failed" 
-    }, { status: 500 })
+    return new Response(
+      JSON.stringify({ error: lastError?.message || "All API keys failed" }), 
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    )
     
   } catch (error) {
-    return NextResponse.json({ 
-      error: "Internal server error" 
-    }, { status: 500 })
+    return new Response(
+      JSON.stringify({ error: "Internal server error" }), 
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    )
   }
 }

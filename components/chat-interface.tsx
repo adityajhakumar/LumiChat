@@ -121,6 +121,8 @@ export default function ChatInterface({
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+  const imageInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (currentStudySession?.lessonSteps) {
@@ -259,13 +261,10 @@ export default function ChatInterface({
     const fileExtension = fileName.split('.').pop()?.toLowerCase()
 
     if (fileExtension === 'pdf') {
-      // Handle PDF files
       try {
         const arrayBuffer = await file.arrayBuffer()
         const uint8Array = new Uint8Array(arrayBuffer)
         
-        // For PDF, we'll extract images using the FileUpload component's logic
-        // For now, just read as text if possible or store the file info
         const reader = new FileReader()
         reader.onload = (event) => {
           const content = event.target?.result as string
@@ -280,7 +279,6 @@ export default function ChatInterface({
         console.error('Error reading PDF:', error)
       }
     } else {
-      // Handle text files
       const reader = new FileReader()
       reader.onload = (event) => {
         const content = event.target?.result as string
@@ -294,10 +292,104 @@ export default function ChatInterface({
     }
   }
 
+  // Streaming handler function
+  const handleStreamResponse = async (
+    response: Response,
+    onChunk: (content: string) => void,
+    onComplete: (data: { fullContent: string; reasoning?: string; lessonSteps?: any[] }) => void,
+    onError: (error: string) => void
+  ) => {
+    const reader = response.body?.getReader()
+    if (!reader) {
+      onError('Response body is not readable')
+      return
+    }
+
+    const decoder = new TextDecoder()
+    let buffer = ''
+    let fullContent = ''
+    let reasoning = ''
+    let lessonSteps: any[] | undefined
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+
+        buffer += decoder.decode(value, { stream: true })
+
+        while (true) {
+          const lineEnd = buffer.indexOf('\n')
+          if (lineEnd === -1) break
+
+          const line = buffer.slice(0, lineEnd).trim()
+          buffer = buffer.slice(lineEnd + 1)
+
+          // Skip empty lines and OpenRouter processing comments
+          if (!line || line.startsWith(':')) continue
+
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6)
+            if (data === '[DONE]') {
+              onComplete({ fullContent, reasoning: reasoning || undefined, lessonSteps })
+              return
+            }
+
+            try {
+              const parsed = JSON.parse(data)
+
+              // Check for mid-stream error
+              if (parsed.error) {
+                onError(parsed.error.message || 'Stream error occurred')
+                return
+              }
+
+              // Check if this is the final metadata chunk
+              if (parsed.done) {
+                fullContent = parsed.fullContent || fullContent
+                reasoning = parsed.reasoning || reasoning
+                lessonSteps = parsed.lessonSteps
+                onComplete({ fullContent, reasoning: reasoning || undefined, lessonSteps })
+                return
+              }
+
+              // Handle content chunks
+              const content = parsed.choices?.[0]?.delta?.content
+              if (content) {
+                fullContent += content
+                onChunk(content)
+              }
+
+              // Handle reasoning chunks
+              const reasoningChunk = parsed.choices?.[0]?.delta?.reasoning
+              if (reasoningChunk) {
+                reasoning += reasoningChunk
+              }
+
+              // Check for finish reason
+              if (parsed.choices?.[0]?.finish_reason === 'error') {
+                onError('Generation stopped due to error')
+                return
+              }
+            } catch (e) {
+              // Ignore invalid JSON chunks
+              console.warn('Failed to parse SSE chunk:', e)
+            }
+          }
+        }
+      }
+    } catch (error: any) {
+      onError(error.message || 'Streaming error occurred')
+    } finally {
+      reader.cancel()
+    }
+  }
+
   const sendMessageToAPIWithFallback = async (
     messagesToSend: Array<{ role: string; content: string }>,
     includeFileContent = false,
-    primaryModel: string
+    primaryModel: string,
+    onStreamChunk?: (content: string) => void
   ) => {
     const fallbackChain = MODEL_FALLBACK_CONFIG.fallbackChains[primaryModel] 
       || MODEL_FALLBACK_CONFIG.universalFallbacks;
@@ -336,13 +428,43 @@ export default function ChatInterface({
             studyMode: studyMode,
             useReasoning: useReasoning,
             reasoningEffort: reasoningEffort,
+            stream: true,
           }),
         });
         
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
         }
-        
+
+        // Handle streaming response
+        if (onStreamChunk && response.headers.get('content-type')?.includes('text/event-stream')) {
+          return new Promise((resolve, reject) => {
+            handleStreamResponse(
+              response,
+              onStreamChunk,
+              (data) => {
+                setRetryStatus({ show: false, currentModel: '', attemptNumber: 0, totalAttempts: 0 });
+                resolve({
+                  data: {
+                    content: data.fullContent,
+                    reasoning: data.reasoning,
+                    lessonSteps: data.lessonSteps,
+                    tokenCount: 0
+                  },
+                  usedModel: currentModel,
+                  fallbackUsed: !isPrimary,
+                  totalAttempts: i + 1
+                });
+              },
+              (error) => {
+                reject(new Error(error));
+              }
+            );
+          });
+        }
+
+        // Fallback to non-streaming
         const data = await response.json();
         
         if (data.error) {
@@ -406,10 +528,31 @@ export default function ChatInterface({
     setTimeout(() => scrollToBottom(true), 50)
     setLoading(true)
 
+    // Add streaming assistant message placeholder
+    const streamingMessage = { role: "assistant", content: "" }
+    const messagesWithStreaming = [...newMessages, streamingMessage]
+    if (!studyMode) {
+      onMessagesChange(messagesWithStreaming)
+    }
+
+    // Stream handler
+    const handleChunk = (content: string) => {
+      if (!studyMode) {
+        messagesWithStreaming[messagesWithStreaming.length - 1].content += content
+        onMessagesChange([...messagesWithStreaming])
+        
+        // Auto-scroll during streaming if near bottom
+        if (!userScrolled) {
+          setTimeout(() => scrollToBottom(), 10)
+        }
+      }
+    }
+
     const result = await sendMessageToAPIWithFallback(
       newMessages,
       shouldIncludeFile,
-      selectedModel
+      selectedModel,
+      handleChunk
     )
 
     setLoading(false)
@@ -468,12 +611,6 @@ export default function ChatInterface({
         const sessions = saved ? JSON.parse(saved) : []
         localStorage.setItem("mmchat_study_sessions", JSON.stringify([studySession, ...sessions]))
       }
-    } else {
-      const assistantMessage = { 
-        role: "assistant", 
-        content: data.content
-      }
-      onMessagesChange([...newMessages, assistantMessage])
     }
 
     onTokenCountChange(data.tokenCount || 0)
@@ -500,8 +637,23 @@ export default function ChatInterface({
     setEditingMessageIndex(null)
     setEditedContent("")
     setLoading(true)
+
+    // Add streaming assistant message placeholder
+    const streamingMessage = { role: "assistant", content: "" }
+    const messagesWithStreaming = [...messagesToKeep, streamingMessage]
+    onMessagesChange(messagesWithStreaming)
+
+    // Stream handler
+    const handleChunk = (content: string) => {
+      messagesWithStreaming[messagesWithStreaming.length - 1].content += content
+      onMessagesChange([...messagesWithStreaming])
+      
+      if (!userScrolled) {
+        setTimeout(() => scrollToBottom(), 10)
+      }
+    }
     
-    const result = await sendMessageToAPIWithFallback(messagesToKeep, false, selectedModel)
+    const result = await sendMessageToAPIWithFallback(messagesToKeep, false, selectedModel, handleChunk)
     setLoading(false)
     
     if (!result) return
@@ -511,13 +663,7 @@ export default function ChatInterface({
       setShowReasoningPanel(true)
     }
     
-    const assistantMessage = { 
-      role: "assistant", 
-      content: result.data.content
-    }
-    onMessagesChange([...messagesToKeep, assistantMessage])
     onTokenCountChange(result.data.tokenCount || 0)
-    
     setTimeout(() => scrollToBottom(true), 50)
   }
 
@@ -530,8 +676,23 @@ export default function ChatInterface({
     const messagesToKeep = messages.slice(0, index)
     onMessagesChange(messagesToKeep)
     setLoading(true)
+
+    // Add streaming assistant message placeholder
+    const streamingMessage = { role: "assistant", content: "" }
+    const messagesWithStreaming = [...messagesToKeep, streamingMessage]
+    onMessagesChange(messagesWithStreaming)
+
+    // Stream handler
+    const handleChunk = (content: string) => {
+      messagesWithStreaming[messagesWithStreaming.length - 1].content += content
+      onMessagesChange([...messagesWithStreaming])
+      
+      if (!userScrolled) {
+        setTimeout(() => scrollToBottom(), 10)
+      }
+    }
     
-    const result = await sendMessageToAPIWithFallback(messagesToKeep, false, selectedModel)
+    const result = await sendMessageToAPIWithFallback(messagesToKeep, false, selectedModel, handleChunk)
     setLoading(false)
     
     if (!result) return
@@ -541,13 +702,7 @@ export default function ChatInterface({
       setShowReasoningPanel(true)
     }
     
-    const assistantMessage = { 
-      role: "assistant", 
-      content: result.data.content
-    }
-    onMessagesChange([...messagesToKeep, assistantMessage])
     onTokenCountChange(result.data.tokenCount || 0)
-    
     setTimeout(() => scrollToBottom(true), 50)
   }
 
@@ -570,6 +725,7 @@ export default function ChatInterface({
           studyMode: false,
           useReasoning: useReasoning,
           reasoningEffort: reasoningEffort,
+          stream: false,
         }),
       })
 
@@ -730,10 +886,6 @@ Format as JSON with this structure:
     selectedModel.includes("reasoning") ||
     selectedModel.includes("tongyi-deepresearch") ||
     selectedModel.includes("qwq")
-
-  // Refs for file inputs
-  const imageInputRef = useRef<HTMLInputElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   // Plus Menu Component
   const PlusMenu = () => {
@@ -1181,7 +1333,6 @@ Format as JSON with this structure:
                   </div>
                 ) : (
                   <>
-                    {/* Show reasoning panel BEFORE assistant's last message */}
                     {msg.role === "assistant" && i === messages.length - 1 && currentReasoning && (
                       <ReasoningPanel reasoning={currentReasoning} />
                     )}
@@ -1284,7 +1435,6 @@ Format as JSON with this structure:
               <VoiceInput onTranscript={(text) => setInput((prev) => prev + text)} />
             </div>
 
-            {/* Hidden file inputs */}
             <input
               ref={imageInputRef}
               type="file"
