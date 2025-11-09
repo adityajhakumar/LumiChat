@@ -41,7 +41,6 @@
   --sidebar-ring: #CC785C;
 }
 
-/* Remove light mode - use dark mode colors for everything */
 .dark {
   --background: #1E1E1E;
   --foreground: #E5E5E0;
@@ -131,7 +130,6 @@
     text-rendering: optimizeLegibility;
   }
   
-  /* Force dark mode always */
   html {
     color-scheme: dark;
   }
@@ -145,7 +143,6 @@
     animation-delay: 200ms;
   }
 
-  /* Claude-style scrollbar */
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -168,13 +165,11 @@
     background: transparent;
   }
 
-  /* Firefox scrollbar */
   * {
     scrollbar-width: thin;
     scrollbar-color: #3E3E38 transparent;
   }
   
-  /* Selection styling */
   ::selection {
     background-color: rgba(204, 120, 92, 0.3);
     color: #E5E5E0;
@@ -186,9 +181,7 @@
   }
 }
 
-/* Additional Claude-specific styles */
 @layer components {
-  /* Smooth focus rings */
   button:focus-visible,
   input:focus-visible,
   textarea:focus-visible,
@@ -197,12 +190,89 @@
     outline-offset: 2px;
   }
   
-  /* Subtle transitions */
   button,
   a,
   input,
   textarea,
   select {
     transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+
+/* =====================================
+   STREAMING + PERFORMANCE OPTIMIZATIONS
+   ===================================== */
+
+.prose {
+  transform: translateZ(0);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  contain: layout style;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.streaming-content {
+  animation: fadeIn 0.2s ease-in;
+}
+
+.message-content {
+  will-change: contents;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.messages-container {
+  scroll-behavior: smooth;
+}
+
+.hljs {
+  contain: layout style paint;
+}
+
+.prose p,
+.prose li,
+.prose h1,
+.prose h2,
+.prose h3 {
+  contain: layout style;
+}
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.streaming-cursor {
+  display: inline-block;
+  width: 2px;
+  height: 1em;
+  background-color: currentColor;
+  animation: blink 1s step-end infinite;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+}
+
+.message-bubble {
+  contain: layout style;
+  transform: translateZ(0);
+  -webkit-transform: translateZ(0);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
