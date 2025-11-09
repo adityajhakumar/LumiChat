@@ -576,7 +576,11 @@ export default function ChatInterface({
       return
     }
 
-    const { data, usedModel, fallbackUsed, totalAttempts } = result
+    // Type-safe destructuring
+    const data = result.data
+    const usedModel = result.usedModel
+    const fallbackUsed = result.fallbackUsed
+    const totalAttempts = result.totalAttempts
 
     if (shouldIncludeFile) {
       setFileContentSent(true)
@@ -658,12 +662,14 @@ export default function ChatInterface({
     
     if (!result) return
 
-    if (result.data.reasoning) {
-      setCurrentReasoning(result.data.reasoning)
+    const data = result.data
+    
+    if (data.reasoning) {
+      setCurrentReasoning(data.reasoning)
       setShowReasoningPanel(true)
     }
     
-    onTokenCountChange(result.data.tokenCount || 0)
+    onTokenCountChange(data.tokenCount || 0)
     setTimeout(() => scrollToBottom(true), 50)
   }
 
@@ -697,12 +703,14 @@ export default function ChatInterface({
     
     if (!result) return
 
-    if (result.data.reasoning) {
-      setCurrentReasoning(result.data.reasoning)
+    const data = result.data
+    
+    if (data.reasoning) {
+      setCurrentReasoning(data.reasoning)
       setShowReasoningPanel(true)
     }
     
-    onTokenCountChange(result.data.tokenCount || 0)
+    onTokenCountChange(data.tokenCount || 0)
     setTimeout(() => scrollToBottom(true), 50)
   }
 
@@ -762,15 +770,17 @@ export default function ChatInterface({
     
     if (!result) return
 
-    if (result.data.reasoning) {
-      setCurrentReasoning(result.data.reasoning)
+    const data = result.data
+    
+    if (data.reasoning) {
+      setCurrentReasoning(data.reasoning)
       setShowReasoningPanel(true)
     }
 
-    if (result.data.lessonSteps) {
-      setLessonSteps(result.data.lessonSteps)
+    if (data.lessonSteps) {
+      setLessonSteps(data.lessonSteps)
     }
-    onTokenCountChange(result.data.tokenCount || 0)
+    onTokenCountChange(data.tokenCount || 0)
   }
 
   const handleCodeFeedback = async (code: string) => {
@@ -799,15 +809,17 @@ Provide constructive feedback and suggestions for improvement.`
     
     if (!result)  return
 
-    if (result.data.reasoning) {
-      setCurrentReasoning(result.data.reasoning)
+    const data = result.data
+    
+    if (data.reasoning) {
+      setCurrentReasoning(data.reasoning)
       setShowReasoningPanel(true)
     }
 
-    if (result.data.lessonSteps) {
-      setLessonSteps(result.data.lessonSteps)
+    if (data.lessonSteps) {
+      setLessonSteps(data.lessonSteps)
     }
-    onTokenCountChange(result.data.tokenCount || 0)
+    onTokenCountChange(data.tokenCount || 0)
   }
 
   const handleStartQuiz = async (numQuestions: number) => {
@@ -846,8 +858,10 @@ Format as JSON with this structure:
     
     if (!result)  return
 
+    const data = result.data
+    
     try {
-      const jsonMatch = result.data.content.match(/\{[\s\S]*\}/)
+      const jsonMatch = data.content.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
         const parsedQuiz = JSON.parse(jsonMatch[0])
         setQuizData(parsedQuiz)
@@ -857,7 +871,7 @@ Format as JSON with this structure:
       console.error("Failed to parse quiz data:", e)
     }
 
-    onTokenCountChange(result.data.tokenCount || 0)
+    onTokenCountChange(data.tokenCount || 0)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
