@@ -3,7 +3,7 @@
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
 import { Copy, RotateCw, ThumbsUp, ThumbsDown, Check, Edit2, MessageSquare, ChevronRight, X } from "lucide-react"
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useMemo, memo } from "react"
 import { Textarea } from "@/components/ui/textarea"
 
 interface Thread {
@@ -21,9 +21,11 @@ interface MessageBubbleProps {
   onCopy?: (content: string) => void
   onFeedback?: (type: "positive" | "negative") => void
   onThreadResponse?: (parentText: string, userMessage: string) => Promise<string>
+  isStreaming?: boolean  // NEW: Add streaming flag
 }
 
-function CodeBlock({ code, language }: { code: string; language: string }) {
+// Memoized CodeBlock to prevent unnecessary re-renders
+const CodeBlock = memo(({ code, language }: { code: string; language: string }) => {
   const [copied, setCopied] = useState(false)
   const [highlighted, setHighlighted] = useState("")
 
@@ -124,7 +126,9 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
       </pre>
     </div>
   )
-}
+})
+
+CodeBlock.displayName = 'CodeBlock'
 
 function ThreadSection({ 
   thread, 
@@ -269,26 +273,32 @@ function ThreadSection({
   )
 }
 
-function ContentWithThreads({ 
+// Memoized content renderer
+const ContentWithThreads = memo(({ 
   content, 
   threads,
   onToggle,
   onReply,
-  onClose
+  onClose,
+  markdownComponents
 }: {
   content: string
   threads: Thread[]
   onToggle: (id: string) => void
   onReply: (id: string, msg: string) => Promise<void>
   onClose: (id: string) => void
-}) {
-  const sortedThreads = [...threads].sort((a, b) => a.insertPosition - b.insertPosition)
+  markdownComponents: any
+}) => {
+  const sortedThreads = useMemo(() => 
+    [...threads].sort((a, b) => a.insertPosition - b.insertPosition),
+    [threads]
+  )
   
   if (sortedThreads.length === 0) {
     return (
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        components={getMarkdownComponents()}
+        components={markdownComponents}
       >
         {content}
       </ReactMarkdown>
@@ -323,7 +333,7 @@ function ContentWithThreads({
         <div key={`content-${idx}`}>
           <ReactMarkdown
             remarkPlugins={[remarkGfm]}
-            components={getMarkdownComponents()}
+            components={markdownComponents}
           >
             {beforeContent}
           </ReactMarkdown>
@@ -350,7 +360,7 @@ function ContentWithThreads({
       <div key="content-end">
         <ReactMarkdown
           remarkPlugins={[remarkGfm]}
-          components={getMarkdownComponents()}
+          components={markdownComponents}
         >
           {remainingContent}
         </ReactMarkdown>
@@ -359,10 +369,31 @@ function ContentWithThreads({
   }
 
   return <>{parts}</>
-}
+})
 
-function getMarkdownComponents() {
-  return {
+ContentWithThreads.displayName = 'ContentWithThreads'
+
+export default function MessageBubble({
+  message,
+  onRegenerate,
+  onEdit,
+  onCopy,
+  onFeedback,
+  onThreadResponse,
+  isStreaming = false  // NEW
+}: MessageBubbleProps) {
+  const isUser = message.role === "user"
+  const [copied, setCopied] = useState(false)
+  const [feedback, setFeedback] = useState<"positive" | "negative" | null>(null)
+  const [threads, setThreads] = useState<Thread[]>([])
+  const [selectedText, setSelectedText] = useState("")
+  const [showThreadButton, setShowThreadButton] = useState(false)
+  const [buttonPosition, setButtonPosition] = useState({ x: 0, y: 0 })
+  const [selectionRange, setSelectionRange] = useState({ start: 0, end: 0 })
+  const messageRef = useRef<HTMLDivElement>(null)
+
+  // Memoize markdown components to prevent recreation
+  const markdownComponents = useMemo(() => ({
     table: ({ node, ...props }: any) => (
       <div className="overflow-x-auto my-6">
         <table className="min-w-full border-collapse border border-[#3A3A3A] rounded-lg" {...props} />
@@ -424,26 +455,7 @@ function getMarkdownComponents() {
         </code>
       )
     }
-  }
-}
-
-export default function MessageBubble({
-  message,
-  onRegenerate,
-  onEdit,
-  onCopy,
-  onFeedback,
-  onThreadResponse
-}: MessageBubbleProps) {
-  const isUser = message.role === "user"
-  const [copied, setCopied] = useState(false)
-  const [feedback, setFeedback] = useState<"positive" | "negative" | null>(null)
-  const [threads, setThreads] = useState<Thread[]>([])
-  const [selectedText, setSelectedText] = useState("")
-  const [showThreadButton, setShowThreadButton] = useState(false)
-  const [buttonPosition, setButtonPosition] = useState({ x: 0, y: 0 })
-  const [selectionRange, setSelectionRange] = useState({ start: 0, end: 0 })
-  const messageRef = useRef<HTMLDivElement>(null)
+  }), [])
 
   const handleCopy = () => {
     navigator.clipboard.writeText(message.content)
@@ -518,6 +530,12 @@ export default function MessageBubble({
   }
 
   useEffect(() => {
+    // Disable text selection during streaming to improve performance
+    if (isStreaming) {
+      setShowThreadButton(false)
+      return
+    }
+
     const handleMouseUp = (e: MouseEvent) => {
       if (!messageRef.current || isUser) return
       
@@ -577,7 +595,7 @@ export default function MessageBubble({
       document.removeEventListener('click', handleClickOutside)
       window.removeEventListener('scroll', handleScroll, true)
     }
-  }, [isUser, message.content])
+  }, [isUser, message.content, isStreaming])
 
   const handleCreateThread = () => {
     if (!selectedText) return
@@ -642,7 +660,7 @@ export default function MessageBubble({
         isUser ? "justify-end" : "justify-start"
       } mb-6 sm:mb-8 px-4 sm:px-6 group relative`}
     >
-      {showThreadButton && (
+      {showThreadButton && !isStreaming && (
         <button
           onClick={handleCreateThread}
           className="thread-button fixed z-50 bg-[#CC785C] hover:bg-[#B8674A] text-white px-3 py-1.5 rounded-lg shadow-xl text-xs font-medium flex items-center gap-1.5 transition-all hover:scale-105 animate-in fade-in slide-in-from-top-2 duration-200"
@@ -695,6 +713,7 @@ export default function MessageBubble({
                 onToggle={toggleThread}
                 onReply={handleThreadReply}
                 onClose={closeThread}
+                markdownComponents={markdownComponents}
               />
             </div>
           </div>
