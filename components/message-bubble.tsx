@@ -3,8 +3,6 @@
 import { useState, useEffect, useRef, useMemo, memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { Textarea } from "@/components/ui/textarea";
 
 import {
@@ -45,7 +43,7 @@ interface MessageBubbleProps {
   isStreaming?: boolean
 }
 
-// ✨ NEW: Syntax-highlighted CodeBlock component
+// ✨ Simple CodeBlock component without react-syntax-highlighter
 const CodeBlock = memo(({ code, language }: { code: string; language: string }) => {
   const [copied, setCopied] = useState(false)
 
@@ -53,24 +51,6 @@ const CodeBlock = memo(({ code, language }: { code: string; language: string }) 
     await navigator.clipboard.writeText(code)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
-  }
-
-  // Custom style matching your app's theme
-  const customStyle = {
-    ...vscDarkPlus,
-    'pre[class*="language-"]': {
-      ...vscDarkPlus['pre[class*="language-"]'],
-      background: '#1A1A1A',
-      margin: 0,
-      padding: '1rem',
-      fontSize: '0.875rem',
-      lineHeight: '1.6',
-    },
-    'code[class*="language-"]': {
-      ...vscDarkPlus['code[class*="language-"]'],
-      background: 'transparent',
-      fontFamily: '"SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
-    }
   }
 
   return (
@@ -99,22 +79,16 @@ const CodeBlock = memo(({ code, language }: { code: string; language: string }) 
       </div>
 
       <div className="overflow-x-auto">
-        <SyntaxHighlighter
-          language={language}
-          style={customStyle}
-          customStyle={{
-            margin: 0,
-            borderRadius: 0,
-            background: '#1A1A1A',
-          }}
-          codeTagProps={{
-            style: {
+        <pre className="p-4 m-0 text-sm leading-relaxed">
+          <code 
+            className="text-[#E5E5E0]"
+            style={{
               fontFamily: '"SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
-            }
-          }}
-        >
-          {code}
-        </SyntaxHighlighter>
+            }}
+          >
+            {code}
+          </code>
+        </pre>
       </div>
     </div>
   )
@@ -383,7 +357,7 @@ export default function MessageBubble({
   const [selectionRange, setSelectionRange] = useState({ start: 0, end: 0 })
   const messageRef = useRef<HTMLDivElement>(null)
 
-  // ✨ UPDATED: Markdown components with new syntax-highlighted CodeBlock
+  // ✨ UPDATED: Simple markdown components without external syntax highlighter
   const markdownComponents = useMemo(() => ({
     table: ({ node, ...props }: any) => (
       <div className="overflow-x-auto my-6">

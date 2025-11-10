@@ -283,8 +283,8 @@ export default function Home() {
       <aside
         ref={sidebarRef}
         className={`fixed md:relative inset-y-0 left-0 z-50 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } w-[280px] md:w-[260px] h-full border-r border-[#2E2E2E] bg-[#171717] transition-transform duration-300 ease-in-out flex flex-col overflow-hidden`}
+          sidebarOpen ? "translate-x-0 md:w-[260px]" : "-translate-x-full md:w-0"
+        } w-[280px] h-full border-r border-[#2E2E2E] bg-[#171717] transition-all duration-300 ease-in-out flex flex-col overflow-hidden`}
       >
         <div className="flex items-center justify-between px-4 py-5">
           <h1 className="text-lg font-normal text-[#E5E5E0]" style={{ fontFamily: "serif" }}>
@@ -405,7 +405,7 @@ export default function Home() {
       </aside>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0 bg-[#212121]">
+      <div className="flex-1 flex flex-col min-w-0 bg-[#212121] transition-all duration-300 ease-in-out">
         {/* Header - Mobile optimized */}
         <header className="border-b border-[#343434] bg-[#1A1A1A] px-3 md:px-4 py-3 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
