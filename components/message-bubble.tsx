@@ -685,27 +685,30 @@ export default function MessageBubble({
       {isUser ? (
         <div className="max-w-[85%] sm:max-w-[75%]">
           <div className="px-4 sm:px-5 py-3 sm:py-3.5 rounded-2xl sm:rounded-3xl bg-[#2C2C2C] text-[#ECECEC] shadow-lg border border-[#3A3A3A]">
-            {/* ✅ Display attached image */}
+            {/* ✅ Display attached image with better styling */}
             {message.image && (
-              <img 
-                src={message.image} 
-                alt="Uploaded" 
-                className="max-w-full rounded-lg mb-3 max-h-80 object-contain cursor-pointer hover:opacity-90 transition-opacity"
-                onClick={() => window.open(message.image, '_blank')}
-              />
+              <div className="mb-3 rounded-xl overflow-hidden bg-[#1A1A1A] border border-[#3A3A3A]">
+                <img 
+                  src={message.image} 
+                  alt="Uploaded" 
+                  className="w-full max-h-96 object-contain cursor-pointer hover:opacity-95 transition-opacity"
+                  onClick={() => window.open(message.image, '_blank')}
+                />
+              </div>
             )}
             
-            {/* ✅ Display PDF images */}
+            {/* ✅ Display PDF images with better grid */}
             {message.images && message.images.length > 0 && (
-              <div className="grid grid-cols-2 gap-2 mb-3">
+              <div className={`gap-2 mb-3 ${message.images.length === 1 ? 'flex' : 'grid grid-cols-2'}`}>
                 {message.images.map((img, idx) => (
-                  <img 
-                    key={idx}
-                    src={img} 
-                    alt={`Page ${idx + 1}`}
-                    className="rounded-lg max-h-48 object-contain border border-[#3A3A3A] cursor-pointer hover:opacity-90 transition-opacity"
-                    onClick={() => window.open(img, '_blank')}
-                  />
+                  <div key={idx} className="rounded-xl overflow-hidden bg-[#1A1A1A] border border-[#3A3A3A]">
+                    <img 
+                      src={img} 
+                      alt={`Page ${idx + 1}`}
+                      className="w-full max-h-64 object-contain cursor-pointer hover:opacity-95 transition-opacity"
+                      onClick={() => window.open(img, '_blank')}
+                    />
+                  </div>
                 ))}
               </div>
             )}
