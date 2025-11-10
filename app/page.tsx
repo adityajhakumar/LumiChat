@@ -8,7 +8,6 @@ import ShareChat from "@/components/share-chat"
 import { Menu, MessageSquare, Trash2, BookOpen, Plus, Sparkles, MoreHorizontal } from "lucide-react"
 import LumiChatsLanding from "@/components/landing-page"
 
-
 interface ChatSession {
   id: string
   name: string
@@ -26,7 +25,6 @@ interface StudySession {
 }
 
 export default function Home() {
-  // Check if user has visited before
   const [showLanding, setShowLanding] = useState(true)
   const [selectedModel, setSelectedModel] = useState("meta-llama/llama-3.3-8b-instruct:free")
   const [tokenCount, setTokenCount] = useState(0)
@@ -42,7 +40,6 @@ export default function Home() {
 
   const sidebarRef = useRef<HTMLDivElement | null>(null)
 
-  // Check if user has visited before
   useEffect(() => {
     if (typeof window !== "undefined") {
       const hasVisited = window.localStorage.getItem("lumichats_has_visited")
@@ -52,7 +49,6 @@ export default function Home() {
     }
   }, [])
 
-  // Handle entering the app
   const handleEnterApp = () => {
     if (typeof window !== "undefined") {
       window.localStorage.setItem("lumichats_has_visited", "true")
@@ -60,7 +56,6 @@ export default function Home() {
     setShowLanding(false)
   }
 
-  // Load chat sessions safely
   useEffect(() => {
     if (typeof window === "undefined" || showLanding) return
     try {
@@ -82,7 +77,6 @@ export default function Home() {
     }
   }, [showLanding])
 
-  // Load study sessions safely
   useEffect(() => {
     if (typeof window === "undefined" || showLanding) return
     try {
@@ -102,14 +96,12 @@ export default function Home() {
     }
   }, [showLanding])
 
-  // Save sessions whenever updated
   useEffect(() => {
     if (typeof window !== "undefined" && !showLanding) {
       window.localStorage.setItem("mmchat_sessions", JSON.stringify(chatSessions))
     }
   }, [chatSessions, showLanding])
 
-  // Auto-update name & metadata
   useEffect(() => {
     if (!currentChatId || messages.length === 0) return
 
@@ -137,7 +129,6 @@ export default function Home() {
     )
   }, [messages, selectedModel, currentChatId])
 
-  // ---- Chat actions ----
   const handleNewChat = () => {
     const newChatId = Date.now().toString()
     const newSession: ChatSession = {
@@ -187,7 +178,6 @@ export default function Home() {
     }
   }
 
-  // ---- Chat grouping (Claude-like) ----
   const groupChatsByTime = (sessions: ChatSession[]) => {
     const now = new Date()
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -217,7 +207,6 @@ export default function Home() {
 
   const chatGroups = groupChatsByTime(chatSessions)
 
-  // Close sidebar when clicking outside on mobile
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (window.innerWidth < 768 && sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
@@ -231,12 +220,10 @@ export default function Home() {
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  // Show landing page first
   if (showLanding) {
     return <LumiChatsLanding onEnterApp={handleEnterApp} />
   }
 
-  // Wait until sessions loaded before rendering UI
   if (!sessionsLoaded) {
     return (
       <main className="flex items-center justify-center h-screen bg-[#212121] text-[#E5E5E0]">
@@ -245,42 +232,45 @@ export default function Home() {
     )
   }
 
-  // ---- UI ----
   return (
     <main className="flex h-screen bg-background font-sans overflow-hidden antialiased">
-      {/* Sidebar */}
+      {/* Sidebar with smooth collapse */}
       <div
         ref={sidebarRef}
-        className={`${sidebarOpen ? "w-[260px]" : "w-0 md:w-0"} h-full border-r border-[#2E2E2E] bg-[#171717] transition-all duration-300 flex flex-col overflow-hidden flex-shrink-0`}
+        className={`${
+          sidebarOpen ? "w-[260px] opacity-100" : "w-0 opacity-0"
+        } h-full border-r border-[#2E2E2E] bg-[#171717] transition-all duration-300 ease-in-out flex flex-col overflow-hidden flex-shrink-0`}
+        style={{
+          visibility: sidebarOpen ? 'visible' : 'hidden',
+        }}
       >
-        <div className={`flex items-center px-4 py-5 ${!sidebarOpen && "hidden"}`}>
-          <h1 className="text-lg font-normal text-[#E5E5E0]" style={{ fontFamily: "serif" }}>
+        <div className="flex items-center px-4 py-5">
+          <h1 className="text-lg font-normal text-[#E5E5E0] whitespace-nowrap" style={{ fontFamily: "serif" }}>
             LumiChat
           </h1>
         </div>
 
-        <div className={`px-3 pb-3 ${!sidebarOpen && "hidden"}`}>
+        <div className="px-3 pb-3">
           <button
             onClick={handleNewChat}
             className="w-full flex items-center gap-2 px-3 py-2 rounded-md bg-transparent hover:bg-[#2A2A2A] text-[#CC785C] transition-colors text-sm"
           >
-            <div className="w-8 h-8 flex items-center justify-center rounded-full bg-[#CC785C]">
+            <div className="w-8 h-8 flex items-center justify-center rounded-full bg-[#CC785C] flex-shrink-0">
               <Plus size={18} strokeWidth={2.5} className="text-white" />
             </div>
-            <span className="font-medium">New chat</span>
+            <span className="font-medium whitespace-nowrap">New chat</span>
           </button>
         </div>
 
-        {/* Navigation */}
-        <div className={`px-2 pb-1 ${!sidebarOpen && "hidden"}`}>
+        <div className="px-2 pb-1">
           <button
             onClick={() => setShowStudyHistory(false)}
             className={`w-full flex items-center gap-3 px-3 py-2 rounded-md transition-all text-sm ${
               !showStudyHistory ? "bg-[#2A2A2A] text-[#E5E5E0]" : "text-[#9B9B95] hover:bg-[#232323]"
             }`}
           >
-            <MessageSquare size={18} />
-            <span>Chats</span>
+            <MessageSquare size={18} className="flex-shrink-0" />
+            <span className="whitespace-nowrap">Chats</span>
           </button>
           <button
             onClick={() => setShowStudyHistory(true)}
@@ -288,13 +278,12 @@ export default function Home() {
               showStudyHistory ? "bg-[#2A2A2A] text-[#E5E5E0]" : "text-[#9B9B95] hover:bg-[#232323]"
             }`}
           >
-            <Sparkles size={18} />
-            <span>Study</span>
+            <Sparkles size={18} className="flex-shrink-0" />
+            <span className="whitespace-nowrap">Study</span>
           </button>
         </div>
 
-        {/* History */}
-        <div className={`flex-1 overflow-y-auto px-2 pt-2 ${!sidebarOpen && "hidden"}`}>
+        <div className="flex-1 overflow-y-auto px-2 pt-2">
           {showStudyHistory ? (
             <div className="space-y-0.5">
               {studySessions.length > 0 ? (
@@ -314,7 +303,6 @@ export default function Home() {
                     <button
                       onClick={(e) => {
                         e.stopPropagation()
-                        // Add delete handler if needed
                       }}
                       className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[#3A3A3A] rounded transition-all text-[#9B9B95] mr-2 flex-shrink-0"
                     >
@@ -331,7 +319,7 @@ export default function Home() {
               {Object.entries(chatGroups).map(([period, sessions]) =>
                 sessions.length > 0 ? (
                   <div key={period}>
-                    <h2 className="text-xs font-medium text-[#6B6B65] px-3 pb-2">{period}</h2>
+                    <h2 className="text-xs font-medium text-[#6B6B65] px-3 pb-2 whitespace-nowrap">{period}</h2>
                     <div className="space-y-0.5">
                       {sessions.map((session) => (
                         <div
@@ -347,10 +335,7 @@ export default function Home() {
                             <div className="text-sm text-[#E5E5E0] truncate">{session.name}</div>
                           </button>
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              handleDeleteChat(session.id, e)
-                            }}
+                            onClick={(e) => handleDeleteChat(session.id, e)}
                             className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[#3A3A3A] rounded transition-all text-[#9B9B95] mr-2 flex-shrink-0"
                           >
                             <Trash2 size={14} />
@@ -385,7 +370,6 @@ export default function Home() {
             </div>
           </div>
           <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
-            {/* Share Button - Only show when there's a current chat with messages */}
             {currentChatId && !studyMode && messages.length > 0 && (
               <ShareChat
                 chatId={currentChatId}
