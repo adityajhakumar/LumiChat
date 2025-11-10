@@ -43,15 +43,71 @@ interface MessageBubbleProps {
   isStreaming?: boolean
 }
 
-// ✨ Simple CodeBlock component without react-syntax-highlighter
+// ✨ NEW: Syntax-highlighted CodeBlock with Prism.js from CDN
 const CodeBlock = memo(({ code, language }: { code: string; language: string }) => {
   const [copied, setCopied] = useState(false)
+  const codeRef = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    // Load Prism.js from CDN
+    if (typeof window !== 'undefined' && !(window as any).Prism) {
+      // Load Prism CSS
+      const link = document.createElement('link')
+      link.rel = 'stylesheet'
+      link.href = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css'
+      document.head.appendChild(link)
+
+      // Load Prism JS
+      const script = document.createElement('script')
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js'
+      script.onload = () => {
+        // Load language-specific scripts
+        const languages = ['python', 'javascript', 'typescript', 'jsx', 'tsx', 'css', 'markup', 'json', 'bash', 'sql', 'java', 'cpp', 'c', 'csharp', 'go', 'rust', 'ruby', 'php']
+        
+        languages.forEach(lang => {
+          const langScript = document.createElement('script')
+          langScript.src = `https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-${lang}.min.js`
+          document.head.appendChild(langScript)
+        })
+
+        // Highlight after loading
+        setTimeout(() => {
+          if ((window as any).Prism && codeRef.current) {
+            (window as any).Prism.highlightElement(codeRef.current)
+          }
+        }, 100)
+      }
+      document.head.appendChild(script)
+    } else if ((window as any).Prism && codeRef.current) {
+      // Prism already loaded, just highlight
+      setTimeout(() => {
+        if ((window as any).Prism && codeRef.current) {
+          (window as any).Prism.highlightElement(codeRef.current)
+        }
+      }, 50)
+    }
+  }, [code, language])
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(code)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
+
+  // Map common language names to Prism language classes
+  const languageMap: { [key: string]: string } = {
+    js: 'javascript',
+    ts: 'typescript',
+    py: 'python',
+    rb: 'ruby',
+    sh: 'bash',
+    yml: 'yaml',
+    md: 'markdown',
+    html: 'markup',
+    xml: 'markup',
+  }
+
+  const prismLanguage = languageMap[language.toLowerCase()] || language.toLowerCase()
 
   return (
     <div className="relative bg-[#1A1A1A] rounded-lg overflow-hidden my-4 border border-[#3A3A3A]">
@@ -79,9 +135,16 @@ const CodeBlock = memo(({ code, language }: { code: string; language: string }) 
       </div>
 
       <div className="overflow-x-auto">
-        <pre className="p-4 m-0 text-sm leading-relaxed">
+        <pre 
+          className="!m-0 !p-4 !bg-[#1A1A1A]"
+          style={{
+            fontSize: '0.875rem',
+            lineHeight: '1.6',
+          }}
+        >
           <code 
-            className="text-[#E5E5E0]"
+            ref={codeRef}
+            className={`language-${prismLanguage}`}
             style={{
               fontFamily: '"SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
             }}
@@ -90,6 +153,16 @@ const CodeBlock = memo(({ code, language }: { code: string; language: string }) 
           </code>
         </pre>
       </div>
+
+      <style jsx>{`
+        pre[class*="language-"] {
+          background: #1A1A1A !important;
+        }
+        code[class*="language-"] {
+          background: transparent !important;
+          text-shadow: none !important;
+        }
+      `}</style>
     </div>
   )
 })
@@ -357,7 +430,7 @@ export default function MessageBubble({
   const [selectionRange, setSelectionRange] = useState({ start: 0, end: 0 })
   const messageRef = useRef<HTMLDivElement>(null)
 
-  // ✨ UPDATED: Simple markdown components without external syntax highlighter
+  // ✨ UPDATED: Markdown components with new syntax-highlighted CodeBlock
   const markdownComponents = useMemo(() => ({
     table: ({ node, ...props }: any) => (
       <div className="overflow-x-auto my-6">
