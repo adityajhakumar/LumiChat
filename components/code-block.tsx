@@ -2,6 +2,8 @@
 
 import { useState } from "react"
 import { Copy, Check } from "lucide-react"
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
 interface CodeBlockProps {
   code: string
@@ -17,6 +19,24 @@ export default function CodeBlock({ code, language = "javascript" }: CodeBlockPr
     setTimeout(() => setCopied(false), 2000)
   }
 
+  // Custom dark theme matching your app's aesthetic
+  const customStyle = {
+    ...vscDarkPlus,
+    'pre[class*="language-"]': {
+      ...vscDarkPlus['pre[class*="language-"]'],
+      background: '#1A1A1A',
+      margin: 0,
+      padding: '1rem',
+      fontSize: '0.875rem',
+      lineHeight: '1.6',
+    },
+    'code[class*="language-"]': {
+      ...vscDarkPlus['code[class*="language-"]'],
+      background: 'transparent',
+      fontFamily: '"SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
+    }
+  }
+
   return (
     <div className="relative bg-[#1A1A1A] rounded-lg overflow-hidden my-4 border border-[#3A3A3A]">
       {/* Header bar with language and copy button */}
@@ -26,7 +46,7 @@ export default function CodeBlock({ code, language = "javascript" }: CodeBlockPr
           {language}
         </span>
 
-        {/* Copy Button - always visible */}
+        {/* Copy Button */}
         <button
           onClick={handleCopy}
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-[#2A2A2A] hover:bg-[#353535] text-[#A0A0A0] hover:text-[#ECECEC] transition-all text-xs font-medium"
@@ -46,17 +66,24 @@ export default function CodeBlock({ code, language = "javascript" }: CodeBlockPr
         </button>
       </div>
 
-      {/* Code Content */}
+      {/* Syntax Highlighted Code Content */}
       <div className="overflow-x-auto">
-        <pre className="text-[#ECECEC] p-4 text-sm leading-relaxed font-mono">
-          <code
-            style={{
-              fontFamily: '"SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace'
-            }}
-          >
-            {code}
-          </code>
-        </pre>
+        <SyntaxHighlighter
+          language={language}
+          style={customStyle}
+          customStyle={{
+            margin: 0,
+            borderRadius: 0,
+            background: '#1A1A1A',
+          }}
+          codeTagProps={{
+            style: {
+              fontFamily: '"SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
+            }
+          }}
+        >
+          {code}
+        </SyntaxHighlighter>
       </div>
     </div>
   )
