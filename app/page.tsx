@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from "react"
 import ChatInterface from "@/components/chat-interface"
 import TokenCounter from "@/components/token-counter"
 import ShareChat from "@/components/share-chat"
-import { Menu, MessageSquare, Trash2, BookOpen, Plus, Sparkles, MoreHorizontal } from "lucide-react"
+import { Menu, MessageSquare, Trash2, BookOpen, Plus, Sparkles, MoreHorizontal, X } from "lucide-react"
 import LumiChatsLanding from "@/components/landing-page"
 
 
@@ -30,7 +30,7 @@ export default function Home() {
   const [selectedModel, setSelectedModel] = useState("meta-llama/llama-4-maverick:free")
   const [tokenCount, setTokenCount] = useState(0)
   const [messages, setMessages] = useState<Array<{ role: string; content: string }>>([])
-  const [sidebarOpen, setSidebarOpen] = useState(false) // Default closed on mobile
+  const [sidebarOpen, setSidebarOpen] = useState(true) // Default open on desktop
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([])
   const [currentChatId, setCurrentChatId] = useState<string | null>(null)
   const [studyMode, setStudyMode] = useState(false)
@@ -47,6 +47,15 @@ export default function Home() {
       if (hasVisited === "true") {
         setShowLanding(false)
       }
+      
+      // Load sidebar state from localStorage
+      const savedSidebarState = window.localStorage.getItem("lumichats_sidebar_open")
+      if (savedSidebarState !== null) {
+        setSidebarOpen(savedSidebarState === "true")
+      } else {
+        // Default: open on desktop, closed on mobile
+        setSidebarOpen(window.innerWidth >= 768)
+      }
     }
   }, [])
 
@@ -56,6 +65,13 @@ export default function Home() {
     }
     setShowLanding(false)
   }
+
+  // Save sidebar state to localStorage
+  useEffect(() => {
+    if (typeof window !== "undefined" && !showLanding) {
+      window.localStorage.setItem("lumichats_sidebar_open", sidebarOpen.toString())
+    }
+  }, [sidebarOpen, showLanding])
 
   useEffect(() => {
     if (typeof window === "undefined" || showLanding) return
@@ -142,7 +158,10 @@ export default function Home() {
     setChatSessions((prev) => [newSession, ...prev])
     setCurrentChatId(newChatId)
     setMessages([])
-    setSidebarOpen(false)
+    // Only close sidebar on mobile after creating new chat
+    if (typeof window !== "undefined" && window.innerWidth < 768) {
+      setSidebarOpen(false)
+    }
   }
 
   const handleLoadChat = (chatId: string) => {
@@ -151,7 +170,10 @@ export default function Home() {
       setCurrentChatId(chatId)
       setMessages(session.messages)
       setSelectedModel(session.model)
-      setSidebarOpen(false)
+      // Only close sidebar on mobile after loading chat
+      if (typeof window !== "undefined" && window.innerWidth < 768) {
+        setSidebarOpen(false)
+      }
     }
   }
 
@@ -175,7 +197,10 @@ export default function Home() {
       setCurrentStudySession(session)
       setStudyMode(true)
       setMessages([{ role: "user", content: session.question }])
-      setSidebarOpen(false)
+      // Only close sidebar on mobile after loading study session
+      if (typeof window !== "undefined" && window.innerWidth < 768) {
+        setSidebarOpen(false)
+      }
     }
   }
 
@@ -208,14 +233,20 @@ export default function Home() {
 
   const chatGroups = groupChatsByTime(chatSessions)
 
-  // Close sidebar when clicking outside
+  // Close sidebar when clicking outside (mobile only)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      // Only apply on mobile
+      if (window.innerWidth >= 768) return
+      
       if (sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
         const target = event.target as HTMLElement
-        if (!target.closest('button[aria-label="Toggle sidebar"]')) {
-          setSidebarOpen(false)
+        // Check if click is on the toggle button
+        const toggleButton = document.querySelector('[data-sidebar-toggle="true"]')
+        if (toggleButton && (toggleButton === target || toggleButton.contains(target))) {
+          return
         }
+        setSidebarOpen(false)
       }
     }
 
@@ -248,24 +279,24 @@ export default function Home() {
         />
       )}
 
-      {/* Sidebar - Mobile optimized */}
+      {/* Sidebar - Collapsible on both mobile and desktop */}
       <aside
         ref={sidebarRef}
         className={`fixed md:relative inset-y-0 left-0 z-50 ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
         } w-[280px] md:w-[260px] h-full border-r border-[#2E2E2E] bg-[#171717] transition-transform duration-300 ease-in-out flex flex-col overflow-hidden`}
       >
         <div className="flex items-center justify-between px-4 py-5">
           <h1 className="text-lg font-normal text-[#E5E5E0]" style={{ fontFamily: "serif" }}>
             LumiChat
           </h1>
-          {/* Close button for mobile */}
+          {/* Close button visible on both mobile and desktop */}
           <button
             onClick={() => setSidebarOpen(false)}
-            className="md:hidden p-2 hover:bg-[#2A2A2A] rounded-md transition-colors text-[#9B9B95]"
+            className="p-2 hover:bg-[#2A2A2A] rounded-md transition-colors text-[#9B9B95]"
             aria-label="Close sidebar"
           >
-            <Menu size={20} />
+            <X size={20} />
           </button>
         </div>
 
@@ -380,6 +411,7 @@ export default function Home() {
           <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
+              data-sidebar-toggle="true"
               className="p-2 hover:bg-[#2A2A2A] rounded-md transition-colors text-[#9B9B95] hover:text-[#E5E5E0] flex-shrink-0"
               aria-label="Toggle sidebar"
             >

@@ -1,12 +1,24 @@
-"use client"
+"use client";
 
-import ReactMarkdown from "react-markdown"
-import remarkGfm from "remark-gfm"
-import { Copy, RotateCw, ThumbsUp, ThumbsDown, Check, Edit2, MessageSquare, ChevronRight, X } from "lucide-react"
-import { useState, useEffect, useRef, useMemo, memo } from "react"
-import { Textarea } from "@/components/ui/textarea"
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { useState, useEffect, useRef, useMemo, memo } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { Textarea } from "@/components/ui/textarea";
+
+import {
+  Copy,
+  RotateCw,
+  ThumbsUp,
+  ThumbsDown,
+  Check,
+  Edit2,
+  MessageSquare,
+  ChevronRight,
+  X
+} from "lucide-react";
+
 
 interface Thread {
   id: string
