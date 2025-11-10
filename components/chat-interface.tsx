@@ -3,7 +3,6 @@
 import type React from "react"
 import QuizMode from "./quiz-mode"
 import { FileText, X, ArrowUp, Brain, ChevronDown, ChevronUp, Plus, Image as ImageIcon, FileUp, Sparkles } from "lucide-react"
-
 import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -16,12 +15,20 @@ import { GripVertical } from "lucide-react"
 import FileUpload from "./file-upload"
 import ModelSelector from "./model-selector"
 
+// Updated Message interface with image support
+interface Message {
+  role: string
+  content: string
+  image?: string
+  images?: string[]
+}
+
 interface ChatInterfaceProps {
   selectedModel: string
   onModelChange: (model: string) => void
   onTokenCountChange: (count: number) => void
-  messages: Array<{ role: string; content: string }>
-  onMessagesChange: (messages: Array<{ role: string; content: string }>) => void
+  messages: Message[]
+  onMessagesChange: (messages: Message[]) => void
   studyMode?: boolean
   onStudyModeComplete?: () => void
   currentStudySession?: any
@@ -93,23 +100,17 @@ export default function ChatInterface({
   const [editingMessageIndex, setEditingMessageIndex] = useState<number | null>(null)
   const [editedContent, setEditedContent] = useState("")
   const [userScrolled, setUserScrolled] = useState(false)
-  
-  // Reasoning states
   const [useReasoning, setUseReasoning] = useState(false)
   const [reasoningEffort, setReasoningEffort] = useState<"low" | "medium" | "high">("medium")
   const [showReasoningPanel, setShowReasoningPanel] = useState(false)
   const [currentReasoning, setCurrentReasoning] = useState<string | null>(null)
-  
-  // Plus menu state
   const [showPlusMenu, setShowPlusMenu] = useState(false)
   const plusMenuRef = useRef<HTMLDivElement>(null)
-  
   const [fallbackInfo, setFallbackInfo] = useState<{
     originalModel: string;
     usedModel: string;
     attempts: number;
   } | null>(null);
-
   const [retryStatus, setRetryStatus] = useState<{
     show: boolean;
     currentModel: string;
@@ -131,14 +132,12 @@ export default function ChatInterface({
     }
   }, [currentStudySession])
 
-  // Close plus menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (plusMenuRef.current && !plusMenuRef.current.contains(event.target as Node)) {
         setShowPlusMenu(false)
       }
     }
-
     if (showPlusMenu) {
       document.addEventListener('mousedown', handleClickOutside)
       return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -147,10 +146,8 @@ export default function ChatInterface({
 
   const scrollToBottom = (force = false) => {
     if (!messagesContainerRef.current || !messagesEndRef.current) return
-    
     const container = messagesContainerRef.current
     const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
-    
     if (force || isNearBottom) {
       messagesEndRef.current.scrollIntoView({ behavior: "auto", block: "end" })
       setUserScrolled(false)
@@ -160,7 +157,6 @@ export default function ChatInterface({
   useEffect(() => {
     const container = messagesContainerRef.current
     if (!container) return
-
     const handleScroll = () => {
       const isAtBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 100
       if (!isAtBottom && !userScrolled) {
@@ -169,7 +165,6 @@ export default function ChatInterface({
         setUserScrolled(false)
       }
     }
-
     container.addEventListener("scroll", handleScroll, { passive: true })
     return () => {
       container.removeEventListener("scroll", handleScroll)
@@ -205,25 +200,20 @@ export default function ChatInterface({
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isDragging || !containerRef.current) return
-
       const container = containerRef.current
       const rect = container.getBoundingClientRect()
       const newPos = ((e.clientX - rect.left) / rect.width) * 100
-
       if (newPos > 30 && newPos < 70) {
         setDividerPos(newPos)
       }
     }
-
     const handleMouseUp = () => {
       setIsDragging(false)
     }
-
     if (isDragging) {
       document.addEventListener("mousemove", handleMouseMove)
       document.addEventListener("mouseup", handleMouseUp)
     }
-
     return () => {
       document.removeEventListener("mousemove", handleMouseMove)
       document.removeEventListener("mouseup", handleMouseUp)
@@ -256,15 +246,12 @@ export default function ChatInterface({
   const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
-
     const fileName = file.name
     const fileExtension = fileName.split('.').pop()?.toLowerCase()
-
     if (fileExtension === 'pdf') {
       try {
         const arrayBuffer = await file.arrayBuffer()
         const uint8Array = new Uint8Array(arrayBuffer)
-        
         const reader = new FileReader()
         reader.onload = (event) => {
           const content = event.target?.result as string
@@ -292,7 +279,6 @@ export default function ChatInterface({
     }
   }
 
-  // Streaming handler function
   const handleStreamResponse = async (
     response: Response,
     onChunk: (content: string) => void,
@@ -304,47 +290,34 @@ export default function ChatInterface({
       onError('Response body is not readable')
       return
     }
-
     const decoder = new TextDecoder()
     let buffer = ''
     let fullContent = ''
     let reasoning = ''
     let lessonSteps: any[] | undefined
-
     try {
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
-
         buffer += decoder.decode(value, { stream: true })
-
         while (true) {
           const lineEnd = buffer.indexOf('\n')
           if (lineEnd === -1) break
-
           const line = buffer.slice(0, lineEnd).trim()
           buffer = buffer.slice(lineEnd + 1)
-
-          // Skip empty lines and OpenRouter processing comments
           if (!line || line.startsWith(':')) continue
-
           if (line.startsWith('data: ')) {
             const data = line.slice(6)
             if (data === '[DONE]') {
               onComplete({ fullContent, reasoning: reasoning || undefined, lessonSteps })
               return
             }
-
             try {
               const parsed = JSON.parse(data)
-
-              // Check for mid-stream error
               if (parsed.error) {
                 onError(parsed.error.message || 'Stream error occurred')
                 return
               }
-
-              // Check if this is the final metadata chunk
               if (parsed.done) {
                 fullContent = parsed.fullContent || fullContent
                 reasoning = parsed.reasoning || reasoning
@@ -352,27 +325,20 @@ export default function ChatInterface({
                 onComplete({ fullContent, reasoning: reasoning || undefined, lessonSteps })
                 return
               }
-
-              // Handle content chunks
               const content = parsed.choices?.[0]?.delta?.content
               if (content) {
                 fullContent += content
                 onChunk(content)
               }
-
-              // Handle reasoning chunks
               const reasoningChunk = parsed.choices?.[0]?.delta?.reasoning
               if (reasoningChunk) {
                 reasoning += reasoningChunk
               }
-
-              // Check for finish reason
               if (parsed.choices?.[0]?.finish_reason === 'error') {
                 onError('Generation stopped due to error')
                 return
               }
             } catch (e) {
-              // Ignore invalid JSON chunks
               console.warn('Failed to parse SSE chunk:', e)
             }
           }
@@ -386,17 +352,13 @@ export default function ChatInterface({
   }
 
   const sendMessageToAPIWithFallback = async (
-    messagesToSend: Array<{ role: string; content: string }>,
+    messagesToSend: Message[],
     includeFileContent = false,
     primaryModel: string,
     onStreamChunk?: (content: string) => void
   ) => {
-    const fallbackChain = MODEL_FALLBACK_CONFIG.fallbackChains[primaryModel] 
-      || MODEL_FALLBACK_CONFIG.universalFallbacks;
-    
-    const modelsToTry = [primaryModel, ...fallbackChain]
-      .slice(0, MODEL_FALLBACK_CONFIG.maxRetries + 1);
-    
+    const fallbackChain = MODEL_FALLBACK_CONFIG.fallbackChains[primaryModel] || MODEL_FALLBACK_CONFIG.universalFallbacks;
+    const modelsToTry = [primaryModel, ...fallbackChain].slice(0, MODEL_FALLBACK_CONFIG.maxRetries + 1);
     const failedAttempts: Array<{ model: string; error: string }> = [];
     
     for (let i = 0; i < modelsToTry.length; i++) {
@@ -411,7 +373,6 @@ export default function ChatInterface({
             attemptNumber: i,
             totalAttempts: modelsToTry.length - 1
           });
-          
           await new Promise(resolve => setTimeout(resolve, MODEL_FALLBACK_CONFIG.retryDelay));
         }
         
@@ -437,7 +398,6 @@ export default function ChatInterface({
           throw new Error(errorData.error?.message || `HTTP ${response.status}: ${response.statusText}`);
         }
 
-        // Handle streaming response
         if (onStreamChunk && response.headers.get('content-type')?.includes('text/event-stream')) {
           return new Promise((resolve, reject) => {
             handleStreamResponse(
@@ -464,35 +424,27 @@ export default function ChatInterface({
           });
         }
 
-        // Fallback to non-streaming
         const data = await response.json();
-        
         if (data.error) {
           throw new Error(data.error);
         }
-        
         if (!data.content || data.content.trim() === '') {
           throw new Error('Empty response received');
         }
-        
         setRetryStatus({ show: false, currentModel: '', attemptNumber: 0, totalAttempts: 0 });
-        
         return {
           data,
           usedModel: currentModel,
           fallbackUsed: !isPrimary,
           totalAttempts: i + 1
         };
-        
       } catch (err: any) {
         const errorMsg = err.message || 'Unknown error';
         console.error(`❌ Model ${currentModel} failed:`, errorMsg);
-        
         failedAttempts.push({
           model: currentModel,
           error: errorMsg
         });
-        
         if (i === modelsToTry.length - 1) {
           setRetryStatus({ show: false, currentModel: '', attemptNumber: 0, totalAttempts: 0 });
           console.error('💥 All models exhausted. Failed attempts:', failedAttempts);
@@ -500,107 +452,84 @@ export default function ChatInterface({
         }
       }
     }
-    
     return null;
   };
 
   const handleSendMessage = async () => {
     if (!input.trim() && !attachedImage && !attachedFile) return
-    
     const shouldIncludeFile = attachedFile !== null && !fileContentSent
-    const userMessage = { role: "user", content: input }
+    
+    // ✅ Include images in message object
+    const userMessage: Message = { 
+      role: "user", 
+      content: input,
+      image: attachedImage || undefined,
+      images: pdfImages.length > 0 ? pdfImages : undefined
+    }
     const newMessages = [...messages, userMessage]
-
+    
     if (!studyMode) {
       onMessagesChange(newMessages)
     }
-
     if (studyMode && input.trim()) {
       setCurrentTopic(input)
     }
-
     setInput("")
     setAttachedImage(null)
     setPdfImages([])
     setFallbackInfo(null)
     setCurrentReasoning(null)
-
     setTimeout(() => scrollToBottom(true), 50)
     setLoading(true)
-
-    // Add streaming assistant message placeholder
-    const streamingMessage = { role: "assistant", content: "" }
+    
+    const streamingMessage: Message = { role: "assistant", content: "" }
     const messagesWithStreaming = [...newMessages, streamingMessage]
     if (!studyMode) {
       onMessagesChange(messagesWithStreaming)
     }
-
-    // Stream handler
+    
     const handleChunk = (content: string) => {
       if (!studyMode) {
         messagesWithStreaming[messagesWithStreaming.length - 1].content += content
         onMessagesChange([...messagesWithStreaming])
-        
-        // Auto-scroll during streaming if near bottom
         if (!userScrolled) {
           setTimeout(() => scrollToBottom(), 10)
         }
       }
     }
-
-    const result = await sendMessageToAPIWithFallback(
-      newMessages,
-      shouldIncludeFile,
-      selectedModel,
-      handleChunk
-    ) as any
-
+    
+    const result = await sendMessageToAPIWithFallback(newMessages, shouldIncludeFile, selectedModel, handleChunk) as any
     setLoading(false)
-
+    
     if (!result)  {
-      const errorMessage = {
+      const errorMessage: Message = {
         role: "assistant",
-        content: `❌ **Unable to Generate Response**\n\n` +
-          `All available models failed to respond. This might be due to:\n\n` +
-          `• Network connectivity issues\n` +
-          `• API rate limits or service unavailability\n` +
-          `• Content policy restrictions\n\n` +
-          `**What you can try:**\n` +
-          `1. Check your internet connection\n` +
-          `2. Wait a moment and try again\n` +
-          `3. Try a different model from the selector\n` +
-          `4. Simplify or rephrase your message\n\n` +
-          `If the problem persists, the service may be temporarily unavailable.`
+        content: `❌ **Unable to Generate Response**\n\nAll available models failed to respond.`
       }
       onMessagesChange([...newMessages, errorMessage])
       return
     }
-
-    // Type-safe destructuring
+    
     const data = result.data
     const usedModel = result.usedModel
     const fallbackUsed = result.fallbackUsed
     const totalAttempts = result.totalAttempts
-
+    
     if (shouldIncludeFile) {
       setFileContentSent(true)
     }
-
     if (fallbackUsed) {
       setFallbackInfo({
         originalModel: selectedModel,
         usedModel: usedModel,
         attempts: totalAttempts - 1
       })
-      
       setTimeout(() => setFallbackInfo(null), 6000)
     }
-
     if (data.reasoning) {
       setCurrentReasoning(data.reasoning)
       setShowReasoningPanel(true)
     }
-
     if (studyMode) {
       if (data.lessonSteps) {
         setLessonSteps(data.lessonSteps)
@@ -616,7 +545,6 @@ export default function ChatInterface({
         localStorage.setItem("mmchat_study_sessions", JSON.stringify([studySession, ...sessions]))
       }
     }
-
     onTokenCountChange(data.tokenCount || 0)
     setTimeout(() => scrollToBottom(true), 50)
   }
@@ -628,47 +556,34 @@ export default function ChatInterface({
 
   const handleSaveEdit = async () => {
     if (editingMessageIndex === null) return
-    
     const updatedMessages = [...messages]
     updatedMessages[editingMessageIndex] = {
       ...updatedMessages[editingMessageIndex],
       content: editedContent
     }
-    
     const messagesToKeep = updatedMessages.slice(0, editingMessageIndex + 1)
     onMessagesChange(messagesToKeep)
-    
     setEditingMessageIndex(null)
     setEditedContent("")
     setLoading(true)
-
-    // Add streaming assistant message placeholder
-    const streamingMessage = { role: "assistant", content: "" }
+    const streamingMessage: Message = { role: "assistant", content: "" }
     const messagesWithStreaming = [...messagesToKeep, streamingMessage]
     onMessagesChange(messagesWithStreaming)
-
-    // Stream handler
     const handleChunk = (content: string) => {
       messagesWithStreaming[messagesWithStreaming.length - 1].content += content
       onMessagesChange([...messagesWithStreaming])
-      
       if (!userScrolled) {
         setTimeout(() => scrollToBottom(), 10)
       }
     }
-    
     const result = await sendMessageToAPIWithFallback(messagesToKeep, false, selectedModel, handleChunk) as any
     setLoading(false)
-    
     if (!result) return
-
     const data = result.data
-    
     if (data.reasoning) {
       setCurrentReasoning(data.reasoning)
       setShowReasoningPanel(true)
     }
-    
     onTokenCountChange(data.tokenCount || 0)
     setTimeout(() => scrollToBottom(true), 50)
   }
@@ -682,48 +597,37 @@ export default function ChatInterface({
     const messagesToKeep = messages.slice(0, index)
     onMessagesChange(messagesToKeep)
     setLoading(true)
-
-    // Add streaming assistant message placeholder
-    const streamingMessage = { role: "assistant", content: "" }
+    const streamingMessage: Message = { role: "assistant", content: "" }
     const messagesWithStreaming = [...messagesToKeep, streamingMessage]
     onMessagesChange(messagesWithStreaming)
-
-    // Stream handler
     const handleChunk = (content: string) => {
       messagesWithStreaming[messagesWithStreaming.length - 1].content += content
       onMessagesChange([...messagesWithStreaming])
-      
       if (!userScrolled) {
         setTimeout(() => scrollToBottom(), 10)
       }
     }
-    
     const result = await sendMessageToAPIWithFallback(messagesToKeep, false, selectedModel, handleChunk) as any
     setLoading(false)
-    
     if (!result) return
-
     const data = result.data
-    
     if (data.reasoning) {
       setCurrentReasoning(data.reasoning)
       setShowReasoningPanel(true)
     }
-    
     onTokenCountChange(data.tokenCount || 0)
     setTimeout(() => scrollToBottom(true), 50)
   }
 
   const handleThreadResponse = async (parentText: string, userMessage: string): Promise<string> => {
     try {
-      const threadMessages = [
+      const threadMessages: Message[] = [
         { 
           role: "system", 
           content: `The user is asking a follow-up question about this specific part of your previous response: "${parentText}". Please provide a focused answer that directly addresses their question in the context of this excerpt.` 
         },
         { role: "user", content: userMessage }
       ]
-
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -736,19 +640,15 @@ export default function ChatInterface({
           stream: false,
         }),
       })
-
       const data = await response.json()
-      
       if (data.error) {
         console.error(data.error)
         return "Sorry, I couldn't generate a response. Please try again."
       }
-
       if (data.reasoning) {
         setCurrentReasoning(data.reasoning)
         setShowReasoningPanel(true)
       }
-
       onTokenCountChange(data.tokenCount || 0)
       return data.content || "Sorry, I couldn't generate a response."
     } catch (err) {
@@ -759,24 +659,18 @@ export default function ChatInterface({
 
   const handleFollowUpQuestion = async () => {
     if (!followUpInput.trim()) return
-
-    const userMessage = { role: "user", content: followUpInput }
+    const userMessage: Message = { role: "user", content: followUpInput }
     const newMessages = [...messages, userMessage]
     setFollowUpInput("")
     setLoading(true)
-
     const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel) as any
     setLoading(false)
-    
     if (!result) return
-
     const data = result.data
-    
     if (data.reasoning) {
       setCurrentReasoning(data.reasoning)
       setShowReasoningPanel(true)
     }
-
     if (data.lessonSteps) {
       setLessonSteps(data.lessonSteps)
     }
@@ -785,7 +679,6 @@ export default function ChatInterface({
 
   const handleCodeFeedback = async (code: string) => {
     if (!code.trim()) return
-
     const feedbackPrompt = `Please review this code and provide feedback on:
 1. Correctness - Does it solve the problem?
 2. Efficiency - Can it be optimized?
@@ -798,24 +691,18 @@ ${code}
 \`\`\`
 
 Provide constructive feedback and suggestions for improvement.`
-
-    const userMessage = { role: "user", content: feedbackPrompt }
+    const userMessage: Message = { role: "user", content: feedbackPrompt }
     const newMessages = [...messages, userMessage]
     setFollowUpInput("")
     setLoading(true)
-
     const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel) as any
     setLoading(false)
-    
     if (!result)  return
-
     const data = result.data
-    
     if (data.reasoning) {
       setCurrentReasoning(data.reasoning)
       setShowReasoningPanel(true)
     }
-
     if (data.lessonSteps) {
       setLessonSteps(data.lessonSteps)
     }
@@ -824,7 +711,6 @@ Provide constructive feedback and suggestions for improvement.`
 
   const handleStartQuiz = async (numQuestions: number) => {
     const lessonContent = lessonSteps.map((step) => `${step.title}: ${step.content}`).join("\n\n")
-
     const quizPrompt = `Based on the following lesson about "${currentTopic}", generate ${numQuestions} multiple choice questions to test understanding.
 
 Lesson Content:
@@ -848,18 +734,13 @@ Format as JSON with this structure:
     }
   ]
 }`
-
-    const userMessage = { role: "user", content: quizPrompt }
+    const userMessage: Message = { role: "user", content: quizPrompt }
     const newMessages = [...messages, userMessage]
     setLoading(true)
-
     const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel) as any
     setLoading(false)
-    
     if (!result)  return
-
     const data = result.data
-    
     try {
       const jsonMatch = data.content.match(/\{[\s\S]*\}/)
       if (jsonMatch) {
@@ -870,7 +751,6 @@ Format as JSON with this structure:
     } catch (e) {
       console.error("Failed to parse quiz data:", e)
     }
-
     onTokenCountChange(data.tokenCount || 0)
   }
 
@@ -893,7 +773,6 @@ Format as JSON with this structure:
     setQuizData(null)
   }
 
-  // Check if current model supports reasoning
   const supportsReasoning = 
     selectedModel.includes("minimax") || 
     selectedModel.includes("deepseek-r1") ||
@@ -901,23 +780,19 @@ Format as JSON with this structure:
     selectedModel.includes("tongyi-deepresearch") ||
     selectedModel.includes("qwq")
 
-  // Plus Menu Component
   const PlusMenu = () => {
     const handleImageClick = () => {
       imageInputRef.current?.click()
       setShowPlusMenu(false)
     }
-
     const handleFileClick = () => {
       fileInputRef.current?.click()
       setShowPlusMenu(false)
     }
-
     const handleThinkingToggle = () => {
       setUseReasoning(!useReasoning)
       setShowPlusMenu(false)
     }
-
     return (
       <div className="relative" ref={plusMenuRef}>
         <button
@@ -927,7 +802,6 @@ Format as JSON with this structure:
         >
           <Plus size={20} className="text-[#9B9B95]" />
         </button>
-
         {showPlusMenu && (
           <div className="absolute bottom-full left-0 mb-2 w-56 bg-[#2A2A2A] border border-[#3A3A3A] rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200 z-50">
             <div className="py-2">
@@ -943,7 +817,6 @@ Format as JSON with this structure:
                   <div className="text-xs text-[#6B6B65]">Upload from device</div>
                 </div>
               </button>
-
               <button
                 onClick={handleFileClick}
                 className="w-full px-4 py-3 flex items-center gap-3 hover:bg-[#3A3A3A] transition-colors text-left group"
@@ -956,7 +829,6 @@ Format as JSON with this structure:
                   <div className="text-xs text-[#6B6B65]">PDF, TXT, or other docs</div>
                 </div>
               </button>
-
               {supportsReasoning && (
                 <>
                   <div className="h-px bg-[#3A3A3A] my-2"></div>
@@ -988,10 +860,8 @@ Format as JSON with this structure:
     )
   }
 
-  // Reasoning Panel Component - Simple ChatGPT style
   const ReasoningPanel = ({ reasoning }: { reasoning: string }) => {
     const [isExpanded, setIsExpanded] = useState(false)
-
     return (
       <div className="mb-3">
         <div className="bg-[#2A2A2A] rounded-lg border border-[#3A3A3A] overflow-hidden">
@@ -1010,7 +880,6 @@ Format as JSON with this structure:
               <ChevronDown size={16} className="text-[#6B6B65] flex-shrink-0" />
             }
           </button>
-          
           {isExpanded && (
             <div className="border-t border-[#3A3A3A] px-4 py-3 bg-[#252525]">
               <div className="text-sm text-[#9B9B95] leading-relaxed whitespace-pre-wrap max-h-80 overflow-y-auto space-y-2">
@@ -1025,10 +894,8 @@ Format as JSON with this structure:
     )
   }
 
-  // Reasoning Controls Component
   const ReasoningControls = () => {
     if (!supportsReasoning) return null
-
     return (
       <div className="mb-3 rounded-xl border border-[#2E2E2E] bg-[#1E1E1E] overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3">
@@ -1050,7 +917,6 @@ Format as JSON with this structure:
               </span>
             </div>
           </label>
-
           {useReasoning && (
             <div className="flex items-center gap-2">
               <span className="text-xs text-[#6B6B65]">Effort:</span>
@@ -1066,7 +932,6 @@ Format as JSON with this structure:
             </div>
           )}
         </div>
-        
         {useReasoning && (
           <div className="px-4 pb-3 text-xs text-[#6B6B65]">
             The model will show its step-by-step thinking process
@@ -1096,7 +961,6 @@ Format as JSON with this structure:
             </div>
           </div>
         )}
-
         {fallbackInfo && (
           <div className="fixed top-20 right-4 bg-[#2A2A2A] border border-[#CC785C] rounded-lg p-4 shadow-xl z-50 max-w-sm animate-in slide-in-from-right duration-300">
             <div className="flex items-start gap-3">
@@ -1144,7 +1008,6 @@ Format as JSON with this structure:
             </div>
           </div>
         )}
-
         <div style={{ width: `${dividerPos}%` }} className="flex flex-col overflow-hidden border-r border-[#2E2E2E]">
           {quizMode && quizData ? (
             <QuizMode quizData={quizData} onComplete={handleQuizComplete} topic={currentTopic} />
@@ -1186,9 +1049,7 @@ Format as JSON with this structure:
                   </div>
                 </div>
               </div>
-
               <ReasoningControls />
-
               <div className="border-t border-[#2E2E2E] bg-[#171717] p-3 md:p-6 flex-shrink-0">
                 <div className="flex flex-col md:flex-row gap-2 md:gap-3">
                   <div className="flex-1">
@@ -1214,7 +1075,6 @@ Format as JSON with this structure:
             </>
           )}
         </div>
-
         <div
           onMouseDown={() => setIsDragging(true)}
           className="w-1 bg-[#2E2E2E] hover:bg-[#CC785C] cursor-col-resize transition-colors flex items-center justify-center group"
@@ -1224,7 +1084,6 @@ Format as JSON with this structure:
             className="text-[#6B6B65] group-hover:text-[#CC785C] opacity-0 group-hover:opacity-100"
           />
         </div>
-
         <div style={{ width: `${100 - dividerPos}%` }} className="flex flex-col overflow-hidden">
           <CodeEditor
             language={codeLanguage}
@@ -1256,7 +1115,6 @@ Format as JSON with this structure:
           </div>
         </div>
       )}
-
       {fallbackInfo && (
         <div className="fixed top-20 right-4 bg-[#2A2A2A] border border-[#CC785C] rounded-lg p-4 shadow-xl z-50 max-w-sm animate-in slide-in-from-right duration-300">
           <div className="flex items-start gap-3">
@@ -1304,7 +1162,6 @@ Format as JSON with this structure:
           </div>
         </div>
       )}
-
       <div 
         ref={messagesContainerRef}
         className="flex-1 overflow-y-auto"
@@ -1355,6 +1212,7 @@ Format as JSON with this structure:
                       onEdit={msg.role === "user" ? () => handleEditMessage(i) : undefined}
                       onRegenerate={msg.role === "assistant" ? () => handleRegenerateResponse(i) : undefined}
                       onThreadResponse={msg.role === "assistant" ? handleThreadResponse : undefined}
+                      isStreaming={loading && i === messages.length - 1}
                     />
                   </>
                 )}
@@ -1365,8 +1223,8 @@ Format as JSON with this structure:
                 <div className="bg-[#2A2A2A] rounded-xl px-4 py-3 inline-block">
                   <div className="flex space-x-2">
                     <div className="w-2 h-2 bg-[#6B6B6B] rounded-full animate-bounce"></div>
-                    <div className="w-2 h-2 bg-[#6B6B6B] rounded-full animate-bounce delay-100"></div>
-                    <div className="w-2 h-2 bg-[#6B6B6B] rounded-full animate-bounce delay-200"></div>
+                    <div className="w-2 h-2 bg-[#6B6B6B] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                    <div className="w-2 h-2 bg-[#6B6B6B] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                   </div>
                 </div>
               </div>
@@ -1376,7 +1234,6 @@ Format as JSON with this structure:
         )}
         </div>
       </div>
-
       {userScrolled && (
         <div className="absolute bottom-24 left-1/2 transform -translate-x-1/2 z-10">
           <button
@@ -1388,11 +1245,9 @@ Format as JSON with this structure:
           </button>
         </div>
       )}
-
       <div className="bg-[#1E1E1E] px-3 sm:px-4 pb-4 sm:pb-6 pt-3 sm:pt-4 flex-shrink-0">
         <div className="max-w-3xl mx-auto">
           <ReasoningControls />
-
           <div className="sm:hidden mb-3">
             <ModelSelector 
               selectedModel={selectedModel} 
@@ -1400,7 +1255,6 @@ Format as JSON with this structure:
               hasImage={!!attachedImage}
             />
           </div>
-
           {attachedImage && (
             <div className="mb-2 sm:mb-3 relative inline-block">
               <img
@@ -1442,13 +1296,11 @@ Format as JSON with this structure:
               </button>
             </div>
           )}
-          
           <div className="relative bg-[#2A2A2A] rounded-2xl sm:rounded-3xl border border-[#3A3A3A] focus-within:border-[#4A4A4A] transition-colors shadow-lg">
             <div className="absolute left-3 sm:left-4 bottom-[14px] sm:bottom-4 flex items-center gap-1 z-10">
               <PlusMenu />
               <VoiceInput onTranscript={(text) => setInput((prev) => prev + text)} />
             </div>
-
             <input
               ref={imageInputRef}
               type="file"
@@ -1463,7 +1315,6 @@ Format as JSON with this structure:
               onChange={handleFileInputChange}
               className="hidden"
             />
-
             <Textarea
               ref={textareaRef}
               value={input}
@@ -1474,7 +1325,6 @@ Format as JSON with this structure:
               rows={1}
               style={{ minHeight: '56px', maxHeight: '200px' }}
             />
-            
             <div className="absolute right-3 sm:right-4 bottom-[14px] sm:bottom-4 flex items-center gap-2">
               <div className="hidden sm:block">
                 <ModelSelector 
@@ -1483,7 +1333,6 @@ Format as JSON with this structure:
                   hasImage={!!attachedImage}
                 />
               </div>
-              
               <button
                 onClick={handleSendMessage}
                 disabled={loading || (!input.trim() && !attachedImage && !attachedFile)}

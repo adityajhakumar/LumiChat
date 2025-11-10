@@ -14,14 +14,22 @@ interface Thread {
   insertPosition: number
 }
 
+// Updated Message interface with image support
+interface Message {
+  role: string
+  content: string
+  image?: string
+  images?: string[]
+}
+
 interface MessageBubbleProps {
-  message: { role: string; content: string }
+  message: Message
   onRegenerate?: () => void
   onEdit?: () => void
   onCopy?: (content: string) => void
   onFeedback?: (type: "positive" | "negative") => void
   onThreadResponse?: (parentText: string, userMessage: string) => Promise<string>
-  isStreaming?: boolean  // NEW: Add streaming flag
+  isStreaming?: boolean
 }
 
 // Memoized CodeBlock to prevent unnecessary re-renders
@@ -380,7 +388,7 @@ export default function MessageBubble({
   onCopy,
   onFeedback,
   onThreadResponse,
-  isStreaming = false  // NEW
+  isStreaming = false
 }: MessageBubbleProps) {
   const isUser = message.role === "user"
   const [copied, setCopied] = useState(false)
@@ -677,15 +685,42 @@ export default function MessageBubble({
       {isUser ? (
         <div className="max-w-[85%] sm:max-w-[75%]">
           <div className="px-4 sm:px-5 py-3 sm:py-3.5 rounded-2xl sm:rounded-3xl bg-[#2C2C2C] text-[#ECECEC] shadow-lg border border-[#3A3A3A]">
-            <p
-              className="text-[15px] sm:text-base leading-relaxed whitespace-pre-wrap break-words"
-              style={{
-                fontFamily:
-                  '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
-              }}
-            >
-              {message.content}
-            </p>
+            {/* ✅ Display attached image */}
+            {message.image && (
+              <img 
+                src={message.image} 
+                alt="Uploaded" 
+                className="max-w-full rounded-lg mb-3 max-h-80 object-contain cursor-pointer hover:opacity-90 transition-opacity"
+                onClick={() => window.open(message.image, '_blank')}
+              />
+            )}
+            
+            {/* ✅ Display PDF images */}
+            {message.images && message.images.length > 0 && (
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                {message.images.map((img, idx) => (
+                  <img 
+                    key={idx}
+                    src={img} 
+                    alt={`Page ${idx + 1}`}
+                    className="rounded-lg max-h-48 object-contain border border-[#3A3A3A] cursor-pointer hover:opacity-90 transition-opacity"
+                    onClick={() => window.open(img, '_blank')}
+                  />
+                ))}
+              </div>
+            )}
+            
+            {message.content && (
+              <p
+                className="text-[15px] sm:text-base leading-relaxed whitespace-pre-wrap break-words"
+                style={{
+                  fontFamily:
+                    '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+                }}
+              >
+                {message.content}
+              </p>
+            )}
           </div>
           
           {onEdit && (
