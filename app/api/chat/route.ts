@@ -55,6 +55,147 @@ function parseStudyModeResponse(content: string): any[] {
   return lessonSteps
 }
 
+// NEW: Intelligent file analysis function
+async function analyzeFileIntelligently(
+  fileContent: string,
+  fileName: string,
+  images: string[] | null,
+  apiKey: string,
+  userQuestion: string
+): Promise<string> {
+  const fileType = fileName.toLowerCase().split('.').pop()
+  
+  let analysisPrompt = ""
+  
+  // Create intelligent prompts based on file type
+  if (fileType === 'xlsx' || fileType === 'xls') {
+    analysisPrompt = `I've uploaded an Excel file named "${fileName}". Here's the extracted content:
+
+${fileContent}
+
+This is raw Excel data. Please:
+1. Identify and describe the structure (sheets, columns, data types)
+2. Recognize any tables, headers, and data patterns
+3. Extract key insights and statistics if it's numerical data
+4. Summarize what this spreadsheet contains
+5. Be ready to answer specific questions about this data
+
+User's question: ${userQuestion || "Please analyze this Excel file and tell me what it contains."}`
+  } 
+  else if (fileType === 'docx' || fileType === 'doc') {
+    analysisPrompt = `I've uploaded a Word document named "${fileName}". Here's the extracted content:
+
+${fileContent}
+
+Please:
+1. Understand the document structure (headings, sections, formatting)
+2. Identify the main topics and key points
+3. Summarize the document's purpose and content
+4. Extract any important information, lists, or data
+5. Be ready to answer questions about this document
+
+User's question: ${userQuestion || "Please analyze this Word document and summarize its content."}`
+  }
+  else if (fileType === 'pdf') {
+    if (images && images.length > 0) {
+      // PDF has images - use vision analysis
+      analysisPrompt = `I've uploaded a PDF file named "${fileName}" with ${images.length} pages.
+
+${fileContent ? `Extracted text:\n${fileContent}\n\n` : ""}
+
+I'm also sending you images of the PDF pages. Please:
+1. Analyze both the text and visual content
+2. Identify tables, charts, diagrams, and their data
+3. Extract structured information
+4. Recognize any forms, layouts, or special formatting
+5. Summarize the complete document
+
+User's question: ${userQuestion || "Please analyze this PDF thoroughly, including any visual elements."}`
+    } else {
+      // Text-only PDF
+      analysisPrompt = `I've uploaded a PDF file named "${fileName}". Here's the extracted content:
+
+${fileContent}
+
+Please:
+1. Understand the document structure and layout
+2. Identify sections, headings, and organization
+3. Extract and structure any tables or lists
+4. Summarize key information
+5. Be ready to answer questions about this PDF
+
+User's question: ${userQuestion || "Please analyze this PDF and tell me what it contains."}`
+    }
+  }
+  else {
+    // Generic file analysis
+    analysisPrompt = `I've uploaded a file named "${fileName}". Here's the content:
+
+${fileContent}
+
+Please analyze this file and provide insights.
+
+User's question: ${userQuestion || "What does this file contain?"}`
+  }
+
+  // Call AI to analyze the file
+  try {
+    const contentParts: any[] = [
+      { type: "text", text: analysisPrompt }
+    ]
+    
+    // Add images for PDF visual analysis
+    if (images && images.length > 0) {
+      const imagesToSend = images.slice(0, 5)
+      imagesToSend.forEach((img: string) => {
+        contentParts.push({ 
+          type: "image_url", 
+          image_url: { url: img } 
+        })
+      })
+    }
+
+    const response = await fetch(OPENROUTER_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+        "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        "X-Title": "LumiChats By TheVersync",
+      },
+      body: JSON.stringify({
+        model: "anthropic/claude-3.5-sonnet", // Use a vision-capable model
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert document analyzer. Extract structured information, identify patterns, and provide intelligent insights. When analyzing:
+- Excel: Recognize data patterns, calculate statistics, identify trends
+- Word: Understand document structure, extract key points, summarize effectively  
+- PDF: Analyze both text and visual elements, extract tables accurately`
+          },
+          {
+            role: "user",
+            content: contentParts.length > 1 ? contentParts : analysisPrompt
+          }
+        ],
+        temperature: 0.3, // Lower temperature for more accurate analysis
+        max_tokens: 4000,
+      }),
+    })
+
+    if (!response.ok) {
+      throw new Error(`Analysis failed: ${response.statusText}`)
+    }
+
+    const data = await response.json()
+    return data.choices[0]?.message?.content || fileContent
+  } catch (error) {
+    console.error("File analysis error:", error)
+    // Fallback to raw content if analysis fails
+    return fileContent
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { 
@@ -68,7 +209,8 @@ export async function POST(request: NextRequest) {
       skillLevel = "beginner",
       useReasoning = false,
       reasoningEffort = "medium",
-      stream = true  // Enable streaming by default
+      stream = true,
+      analyzeFile = false  // NEW: Flag to trigger intelligent file analysis
     } = await request.json()
 
     if (!messages || !model) {
@@ -78,15 +220,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // NEW: If file analysis is requested, analyze it first
+    let analyzedContent = fileContent
+    if (analyzeFile && fileContent && fileName && API_KEYS[0]) {
+      const userQuestion = messages[messages.length - 1]?.content || ""
+      analyzedContent = await analyzeFileIntelligently(
+        fileContent,
+        fileName,
+        images,
+        API_KEYS[0],
+        userQuestion
+      )
+    }
+
     const formattedMessages = messages.map((msg: any, index: number) => {
       if (msg.role === "user") {
         const contentParts: any[] = []
         
         if (index === messages.length - 1) {
-          if (fileContent && fileContent.trim()) {
+          // Use analyzed content instead of raw content
+          if (analyzedContent && analyzedContent.trim()) {
             const fileContext = fileName 
-              ? `\n\n[File: ${fileName}]\n${fileContent}\n[End of file content]\n\n`
-              : `\n\n[Uploaded content]\n${fileContent}\n[End of content]\n\n`
+              ? `\n\n[Analyzed File: ${fileName}]\n${analyzedContent}\n[End of analysis]\n\n`
+              : `\n\n[Analyzed content]\n${analyzedContent}\n[End of analysis]\n\n`
             contentParts.push({ type: "text", text: fileContext + msg.content })
           } else {
             contentParts.push({ type: "text", text: msg.content })
@@ -175,20 +331,20 @@ IMPORTANT: Always use proper markdown code blocks with language specification li
 You are a helpful, knowledgeable, and friendly assistant.
 
 CRITICAL: When analyzing uploaded files or documents:
-- The file content is included in the user's messages with markers like [File: filename]
-- The file content persists throughout the ENTIRE conversation
-- You have access to ALL previous messages, including the original file upload
-- Always reference the file context from earlier messages when answering follow-up questions
-- Maintain awareness of the file's content across multiple turns of conversation
+- Files have been pre-analyzed for structure and content
+- You receive intelligent summaries and extracted information
+- For Excel: Data patterns, statistics, and table structures are identified
+- For Word: Document structure, key points, and formatting are preserved
+- For PDF: Both text and visual elements are analyzed
+- Always reference the analyzed content when answering questions
+- Maintain context across conversation turns
 
-When analyzing documents:
-- Read and understand the entire content thoroughly
-- Identify key information, patterns, and insights
-- Answer questions about the document accurately based on previous context
+When working with documents:
+- Understand the pre-processed structure and insights
+- Answer questions accurately based on the analysis
 - Extract specific details when asked
-- Summarize if requested
-- Analyze data, tables, and structured information
-- For images, describe what you see in detail
+- Provide summaries and insights
+- Work with tables, data, and structured information intelligently
 
 If anyone asks who made you or who developed you, always respond:
 "I was made by Aditya Kumar Jha at LumiChats."
@@ -247,7 +403,6 @@ Keep responses clear, polite, and engaging.`
               
               for (const line of lines) {
                 if (line.startsWith(':')) {
-                  // OpenRouter processing comment - pass through
                   controller.enqueue(encoder.encode(line + '\n\n'))
                   continue
                 }
@@ -255,7 +410,6 @@ Keep responses clear, polite, and engaging.`
                 if (line.startsWith('data: ')) {
                   const data = line.slice(6)
                   if (data === '[DONE]') {
-                    // Send final metadata
                     const finalData = {
                       done: true,
                       fullContent,
@@ -270,7 +424,6 @@ Keep responses clear, polite, and engaging.`
                   try {
                     const parsed = JSON.parse(data)
                     
-                    // Check for mid-stream error
                     if (parsed.error) {
                       controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: parsed.error })}\n\n`))
                       controller.enqueue(encoder.encode('data: [DONE]\n\n'))
@@ -283,14 +436,12 @@ Keep responses clear, polite, and engaging.`
                       controller.enqueue(encoder.encode(`data: ${data}\n\n`))
                     }
                     
-                    // Capture reasoning if present
                     const reasoningChunk = parsed.choices?.[0]?.delta?.reasoning
                     if (reasoningChunk) {
                       reasoning += reasoningChunk
                       controller.enqueue(encoder.encode(`data: ${data}\n\n`))
                     }
                     
-                    // Check for finish reason
                     if (parsed.choices?.[0]?.finish_reason) {
                       controller.enqueue(encoder.encode(`data: ${data}\n\n`))
                     }

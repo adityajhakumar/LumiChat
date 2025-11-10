@@ -89,6 +89,7 @@ export default function ChatInterface({
   const [attachedFile, setAttachedFile] = useState<{ content: string; name: string } | null>(null)
   const [pdfImages, setPdfImages] = useState<string[]>([])
   const [fileContentSent, setFileContentSent] = useState(false)
+  const [analyzingFile, setAnalyzingFile] = useState(false)
   const [codeLanguage, setCodeLanguage] = useState("python")
   const [lessonSteps, setLessonSteps] = useState<any[]>([])
   const [followUpInput, setFollowUpInput] = useState("")
@@ -224,7 +225,7 @@ export default function ChatInterface({
     setAttachedFile({ content, name: fileName })
     setFileContentSent(false)
     if (!input.trim()) {
-      setInput("Analyze this document")
+      setInput("Please analyze this document thoroughly and tell me what it contains.")
     }
   }
 
@@ -258,7 +259,7 @@ export default function ChatInterface({
           setAttachedFile({ content: fileName, name: fileName })
           setFileContentSent(false)
           if (!input.trim()) {
-            setInput("Analyze this document")
+            setInput("Please analyze this document thoroughly and tell me what it contains.")
           }
         }
         reader.readAsDataURL(file)
@@ -272,7 +273,7 @@ export default function ChatInterface({
         setAttachedFile({ content, name: fileName })
         setFileContentSent(false)
         if (!input.trim()) {
-          setInput("Analyze this document")
+          setInput("Please analyze this document thoroughly and tell me what it contains.")
         }
       }
       reader.readAsText(file)
@@ -355,7 +356,8 @@ export default function ChatInterface({
     messagesToSend: Message[],
     includeFileContent = false,
     primaryModel: string,
-    onStreamChunk?: (content: string) => void
+    onStreamChunk?: (content: string) => void,
+    analyzeFile = false
   ) => {
     const fallbackChain = MODEL_FALLBACK_CONFIG.fallbackChains[primaryModel] || MODEL_FALLBACK_CONFIG.universalFallbacks;
     const modelsToTry = [primaryModel, ...fallbackChain].slice(0, MODEL_FALLBACK_CONFIG.maxRetries + 1);
@@ -390,6 +392,7 @@ export default function ChatInterface({
             useReasoning: useReasoning,
             reasoningEffort: reasoningEffort,
             stream: true,
+            analyzeFile: analyzeFile,
           }),
         });
         
@@ -459,7 +462,11 @@ export default function ChatInterface({
     if (!input.trim() && !attachedImage && !attachedFile) return
     const shouldIncludeFile = attachedFile !== null && !fileContentSent
     
-    // ✅ Include images in message object
+    // Show analysis indicator for files
+    if (shouldIncludeFile) {
+      setAnalyzingFile(true)
+    }
+    
     const userMessage: Message = { 
       role: "user", 
       content: input,
@@ -498,8 +505,16 @@ export default function ChatInterface({
       }
     }
     
-    const result = await sendMessageToAPIWithFallback(newMessages, shouldIncludeFile, selectedModel, handleChunk) as any
+    const result = await sendMessageToAPIWithFallback(
+      newMessages, 
+      shouldIncludeFile, 
+      selectedModel, 
+      handleChunk,
+      shouldIncludeFile
+    ) as any
+    
     setLoading(false)
+    setAnalyzingFile(false)
     
     if (!result)  {
       const errorMessage: Message = {
@@ -576,7 +591,7 @@ export default function ChatInterface({
         setTimeout(() => scrollToBottom(), 10)
       }
     }
-    const result = await sendMessageToAPIWithFallback(messagesToKeep, false, selectedModel, handleChunk) as any
+    const result = await sendMessageToAPIWithFallback(messagesToKeep, false, selectedModel, handleChunk, false) as any
     setLoading(false)
     if (!result) return
     const data = result.data
@@ -607,7 +622,7 @@ export default function ChatInterface({
         setTimeout(() => scrollToBottom(), 10)
       }
     }
-    const result = await sendMessageToAPIWithFallback(messagesToKeep, false, selectedModel, handleChunk) as any
+    const result = await sendMessageToAPIWithFallback(messagesToKeep, false, selectedModel, handleChunk, false) as any
     setLoading(false)
     if (!result) return
     const data = result.data
@@ -638,6 +653,7 @@ export default function ChatInterface({
           useReasoning: useReasoning,
           reasoningEffort: reasoningEffort,
           stream: false,
+          analyzeFile: false,
         }),
       })
       const data = await response.json()
@@ -663,7 +679,7 @@ export default function ChatInterface({
     const newMessages = [...messages, userMessage]
     setFollowUpInput("")
     setLoading(true)
-    const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel) as any
+    const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel, undefined, false) as any
     setLoading(false)
     if (!result) return
     const data = result.data
@@ -695,7 +711,7 @@ Provide constructive feedback and suggestions for improvement.`
     const newMessages = [...messages, userMessage]
     setFollowUpInput("")
     setLoading(true)
-    const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel) as any
+    const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel, undefined, false) as any
     setLoading(false)
     if (!result)  return
     const data = result.data
@@ -737,7 +753,7 @@ Format as JSON with this structure:
     const userMessage: Message = { role: "user", content: quizPrompt }
     const newMessages = [...messages, userMessage]
     setLoading(true)
-    const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel) as any
+    const result = await sendMessageToAPIWithFallback(newMessages, false, selectedModel, undefined, false) as any
     setLoading(false)
     if (!result)  return
     const data = result.data
@@ -1162,6 +1178,27 @@ Format as JSON with this structure:
           </div>
         </div>
       )}
+      {analyzingFile && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 bg-[#2A2A2A] border border-blue-600/50 rounded-lg p-4 shadow-xl z-50 max-w-md animate-in slide-in-from-top duration-300">
+          <div className="flex items-center gap-3">
+            <div className="flex-shrink-0">
+              <div className="relative w-10 h-10">
+                <div className="absolute inset-0 rounded-full border-4 border-blue-500/20"></div>
+                <div className="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent animate-spin"></div>
+                <Sparkles size={16} className="absolute inset-0 m-auto text-blue-400" />
+              </div>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-semibold text-blue-400 mb-1">
+                🧠 AI Analyzing Document...
+              </p>
+              <p className="text-xs text-[#9B9B95]">
+                Extracting structure, tables, insights, and visual content
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       <div 
         ref={messagesContainerRef}
         className="flex-1 overflow-y-auto"
@@ -1279,8 +1316,17 @@ Format as JSON with this structure:
                   {pdfImages.length > 0 && (
                     <span className="text-xs text-[#6B6B65]">{pdfImages.length} pages extracted</span>
                   )}
-                  {fileContentSent && (
-                    <span className="text-xs text-green-500">✓ Context maintained</span>
+                  {fileContentSent && !analyzingFile && (
+                    <span className="text-xs text-green-500 flex items-center gap-1">
+                      <Sparkles size={12} />
+                      AI-analyzed & ready
+                    </span>
+                  )}
+                  {analyzingFile && (
+                    <span className="text-xs text-blue-400 flex items-center gap-1">
+                      <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                      Analyzing...
+                    </span>
                   )}
                 </div>
               </div>
@@ -1299,6 +1345,11 @@ Format as JSON with this structure:
           <div className="relative bg-[#2A2A2A] rounded-2xl sm:rounded-3xl border border-[#3A3A3A] focus-within:border-[#4A4A4A] transition-colors shadow-lg">
             <div className="absolute left-3 sm:left-4 bottom-[14px] sm:bottom-4 flex items-center gap-1 z-10">
               <PlusMenu />
+              <FileUpload 
+                onFileSelect={handleFileSelect}
+                onImagesExtracted={handlePdfImagesExtracted}
+                onPdfImageSelect={setPdfImages}
+              />
               <VoiceInput onTranscript={(text) => setInput((prev) => prev + text)} />
             </div>
             <input
@@ -1311,7 +1362,7 @@ Format as JSON with this structure:
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf,.txt,.doc,.docx,.json,.csv,.md"
+              accept=".pdf,.txt,.doc,.docx,.json,.csv,.md,.xlsx,.xls"
               onChange={handleFileInputChange}
               className="hidden"
             />
@@ -1321,7 +1372,7 @@ Format as JSON with this structure:
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Type your message"
-              className="resize-none bg-transparent border-0 text-white placeholder-[#6B6B6B] focus:ring-0 rounded-2xl sm:rounded-3xl text-[15px] pl-[100px] sm:pl-28 pr-[60px] sm:pr-32 py-[18px] sm:py-5 w-full leading-6"
+              className="resize-none bg-transparent border-0 text-white placeholder-[#6B6B6B] focus:ring-0 rounded-2xl sm:rounded-3xl text-[15px] pl-[120px] sm:pl-32 pr-[60px] sm:pr-32 py-[18px] sm:py-5 w-full leading-6"
               rows={1}
               style={{ minHeight: '56px', maxHeight: '200px' }}
             />
