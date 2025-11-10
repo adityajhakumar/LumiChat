@@ -8,6 +8,7 @@ import ShareChat from "@/components/share-chat"
 import { Menu, MessageSquare, Trash2, BookOpen, Plus, Sparkles, MoreHorizontal } from "lucide-react"
 import LumiChatsLanding from "@/components/landing-page"
 
+
 interface ChatSession {
   id: string
   name: string
@@ -29,7 +30,7 @@ export default function Home() {
   const [selectedModel, setSelectedModel] = useState("meta-llama/llama-3.3-8b-instruct:free")
   const [tokenCount, setTokenCount] = useState(0)
   const [messages, setMessages] = useState<Array<{ role: string; content: string }>>([])
-  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(false) // Default closed on mobile
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([])
   const [currentChatId, setCurrentChatId] = useState<string | null>(null)
   const [studyMode, setStudyMode] = useState(false)
@@ -207,18 +208,23 @@ export default function Home() {
 
   const chatGroups = groupChatsByTime(chatSessions)
 
+  // Close sidebar when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (window.innerWidth < 768 && sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
+      if (sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
         const target = event.target as HTMLElement
-        if (!target.closest('button[title*="sidebar"]')) {
+        if (!target.closest('button[aria-label="Toggle sidebar"]')) {
           setSidebarOpen(false)
         }
       }
     }
-    document.addEventListener("mousedown", handleClickOutside)
+
+    if (sidebarOpen) {
+      document.addEventListener("mousedown", handleClickOutside)
+    }
+    
     return () => document.removeEventListener("mousedown", handleClickOutside)
-  }, [])
+  }, [sidebarOpen])
 
   if (showLanding) {
     return <LumiChatsLanding onEnterApp={handleEnterApp} />
@@ -234,20 +240,33 @@ export default function Home() {
 
   return (
     <main className="flex h-screen bg-background font-sans overflow-hidden antialiased">
-      {/* Sidebar with smooth collapse */}
-      <div
+      {/* Mobile Overlay */}
+      {sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar - Mobile optimized */}
+      <aside
         ref={sidebarRef}
-        className={`${
-          sidebarOpen ? "w-[260px] opacity-100" : "w-0 opacity-0"
-        } h-full border-r border-[#2E2E2E] bg-[#171717] transition-all duration-300 ease-in-out flex flex-col overflow-hidden flex-shrink-0`}
-        style={{
-          visibility: sidebarOpen ? 'visible' : 'hidden',
-        }}
+        className={`fixed md:relative inset-y-0 left-0 z-50 ${
+          sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        } w-[280px] md:w-[260px] h-full border-r border-[#2E2E2E] bg-[#171717] transition-transform duration-300 ease-in-out flex flex-col overflow-hidden`}
       >
-        <div className="flex items-center px-4 py-5">
-          <h1 className="text-lg font-normal text-[#E5E5E0] whitespace-nowrap" style={{ fontFamily: "serif" }}>
+        <div className="flex items-center justify-between px-4 py-5">
+          <h1 className="text-lg font-normal text-[#E5E5E0]" style={{ fontFamily: "serif" }}>
             LumiChat
           </h1>
+          {/* Close button for mobile */}
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="md:hidden p-2 hover:bg-[#2A2A2A] rounded-md transition-colors text-[#9B9B95]"
+            aria-label="Close sidebar"
+          >
+            <Menu size={20} />
+          </button>
         </div>
 
         <div className="px-3 pb-3">
@@ -352,16 +371,17 @@ export default function Home() {
             </div>
           )}
         </div>
-      </div>
+      </aside>
 
       {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 bg-[#212121]">
-        <div className="border-b border-[#343434] bg-[#1A1A1A] px-3 md:px-4 py-3 flex items-center justify-between flex-shrink-0">
+        {/* Header - Mobile optimized */}
+        <header className="border-b border-[#343434] bg-[#1A1A1A] px-3 md:px-4 py-3 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
             <button
               onClick={() => setSidebarOpen(!sidebarOpen)}
               className="p-2 hover:bg-[#2A2A2A] rounded-md transition-colors text-[#9B9B95] hover:text-[#E5E5E0] flex-shrink-0"
-              title={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+              aria-label="Toggle sidebar"
             >
               <Menu size={20} />
             </button>
@@ -369,7 +389,8 @@ export default function Home() {
               {currentChatId ? chatSessions.find((s) => s.id === currentChatId)?.name : "LumiChat"}
             </div>
           </div>
-          <div className="flex items-center gap-2 md:gap-3 flex-shrink-0">
+          
+          <div className="flex items-center gap-2 flex-shrink-0">
             {currentChatId && !studyMode && messages.length > 0 && (
               <ShareChat
                 chatId={currentChatId}
@@ -386,7 +407,7 @@ export default function Home() {
                   setMessages([])
                 }
               }}
-              className={`px-2 md:px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5 md:gap-2 text-sm font-medium ${
+              className={`px-2 md:px-3 py-1.5 rounded-md transition-colors flex items-center gap-1.5 text-sm font-medium ${
                 studyMode
                   ? "bg-[#CC785C] text-white"
                   : "bg-[#2A2A2A] text-[#9B9B95] hover:bg-[#343434] hover:text-[#E5E5E0]"
@@ -396,12 +417,14 @@ export default function Home() {
               <span className="hidden sm:inline">Study Mode</span>
               <span className="sm:hidden">Study</span>
             </button>
-            <div className="hidden md:block">
+            
+            <div className="hidden lg:block">
               <TokenCounter count={tokenCount} />
             </div>
           </div>
-        </div>
+        </header>
 
+        {/* Chat area */}
         <div className="flex-1 overflow-hidden">
           <ChatInterface
             selectedModel={selectedModel}
