@@ -5,6 +5,8 @@ import remarkGfm from "remark-gfm"
 import { Copy, RotateCw, ThumbsUp, ThumbsDown, Check, Edit2, MessageSquare, ChevronRight, X } from "lucide-react"
 import { useState, useEffect, useRef, useMemo, memo } from "react"
 import { Textarea } from "@/components/ui/textarea"
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism'
 
 interface Thread {
   id: string
@@ -14,7 +16,6 @@ interface Thread {
   insertPosition: number
 }
 
-// Updated Message interface with image support
 interface Message {
   role: string
   content: string
@@ -32,65 +33,32 @@ interface MessageBubbleProps {
   isStreaming?: boolean
 }
 
-// Memoized CodeBlock to prevent unnecessary re-renders
+// ✨ NEW: Syntax-highlighted CodeBlock component
 const CodeBlock = memo(({ code, language }: { code: string; language: string }) => {
   const [copied, setCopied] = useState(false)
-  const [highlighted, setHighlighted] = useState("")
-
-  useEffect(() => {
-    const loadHighlightJS = async () => {
-      try {
-        const checkHljs = () => {
-          return new Promise<void>((resolve) => {
-            if (typeof window !== 'undefined' && (window as any).hljs) {
-              resolve()
-            } else {
-              const interval = setInterval(() => {
-                if (typeof window !== 'undefined' && (window as any).hljs) {
-                  clearInterval(interval)
-                  resolve()
-                }
-              }, 100)
-              
-              setTimeout(() => {
-                clearInterval(interval)
-                resolve()
-              }, 3000)
-            }
-          })
-        }
-
-        await checkHljs()
-
-        if (typeof window !== 'undefined' && (window as any).hljs) {
-          const hljs = (window as any).hljs
-          const validLang = hljs.getLanguage(language) ? language : 'plaintext'
-          const result = hljs.highlight(code, { language: validLang })
-          setHighlighted(result.value)
-        } else {
-          const escaped = code
-            .replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-          setHighlighted(escaped)
-        }
-      } catch (error) {
-        console.error('Highlight.js error:', error)
-        const escaped = code
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-        setHighlighted(escaped)
-      }
-    }
-
-    loadHighlightJS()
-  }, [code, language])
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(code)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  // Custom style matching your app's theme
+  const customStyle = {
+    ...vscDarkPlus,
+    'pre[class*="language-"]': {
+      ...vscDarkPlus['pre[class*="language-"]'],
+      background: '#1A1A1A',
+      margin: 0,
+      padding: '1rem',
+      fontSize: '0.875rem',
+      lineHeight: '1.6',
+    },
+    'code[class*="language-"]': {
+      ...vscDarkPlus['code[class*="language-"]'],
+      background: 'transparent',
+      fontFamily: '"SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
+    }
   }
 
   return (
@@ -118,20 +86,24 @@ const CodeBlock = memo(({ code, language }: { code: string; language: string }) 
         </button>
       </div>
 
-      <pre className="m-0 p-4 overflow-x-auto bg-[#1A1A1A]">
-        <code
-          className="text-[#D4D4D4] text-sm block hljs"
-          style={{
-            fontFamily:
-              '"SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
-            whiteSpace: "pre",
-            wordBreak: "normal",
-            wordWrap: "normal",
-            lineHeight: "1.5"
+      <div className="overflow-x-auto">
+        <SyntaxHighlighter
+          language={language}
+          style={customStyle}
+          customStyle={{
+            margin: 0,
+            borderRadius: 0,
+            background: '#1A1A1A',
           }}
-          dangerouslySetInnerHTML={{ __html: highlighted }}
-        />
-      </pre>
+          codeTagProps={{
+            style: {
+              fontFamily: '"SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace',
+            }
+          }}
+        >
+          {code}
+        </SyntaxHighlighter>
+      </div>
     </div>
   )
 })
@@ -281,7 +253,6 @@ function ThreadSection({
   )
 }
 
-// Memoized content renderer
 const ContentWithThreads = memo(({ 
   content, 
   threads,
@@ -400,7 +371,7 @@ export default function MessageBubble({
   const [selectionRange, setSelectionRange] = useState({ start: 0, end: 0 })
   const messageRef = useRef<HTMLDivElement>(null)
 
-  // Memoize markdown components to prevent recreation
+  // ✨ UPDATED: Markdown components with new syntax-highlighted CodeBlock
   const markdownComponents = useMemo(() => ({
     table: ({ node, ...props }: any) => (
       <div className="overflow-x-auto my-6">
@@ -538,7 +509,6 @@ export default function MessageBubble({
   }
 
   useEffect(() => {
-    // Disable text selection during streaming to improve performance
     if (isStreaming) {
       setShowThreadButton(false)
       return
@@ -685,7 +655,6 @@ export default function MessageBubble({
       {isUser ? (
         <div className="max-w-[85%] sm:max-w-[75%]">
           <div className="px-4 sm:px-5 py-3 sm:py-3.5 rounded-2xl sm:rounded-3xl bg-[#2C2C2C] text-[#ECECEC] shadow-lg border border-[#3A3A3A]">
-            {/* ✅ Display attached image with better styling */}
             {message.image && (
               <div className="mb-3 rounded-xl overflow-hidden bg-[#1A1A1A] border border-[#3A3A3A]">
                 <img 
@@ -697,7 +666,6 @@ export default function MessageBubble({
               </div>
             )}
             
-            {/* ✅ Display PDF images with better grid */}
             {message.images && message.images.length > 0 && (
               <div className={`gap-2 mb-3 ${message.images.length === 1 ? 'flex' : 'grid grid-cols-2'}`}>
                 {message.images.map((img, idx) => (
