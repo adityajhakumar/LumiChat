@@ -5,7 +5,10 @@ interface FileUploadProps {
   onFileSelect: (content: string, fileName: string) => void
   onImagesExtracted?: (images: string[], fileName: string) => void
   onPdfImageSelect?: (images: string[]) => void
-  maxPdfPages?: number // Optional limit, defaults to unlimited
+  maxPdfPages?: number
+  chunkSize?: number // Pages to process at once
+  imageScale?: number // Scale for PDF to image conversion
+  imageQuality?: number // JPEG quality 0-1
 }
 
 declare global {
@@ -14,7 +17,15 @@ declare global {
   }
 }
 
-export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImageSelect, maxPdfPages }: FileUploadProps) {
+export default function FileUpload({ 
+  onFileSelect, 
+  onImagesExtracted, 
+  onPdfImageSelect, 
+  maxPdfPages,
+  chunkSize = 5,
+  imageScale = 1.0,
+  imageQuality = 0.7
+}: FileUploadProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
@@ -22,12 +33,12 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
   const [pdfJsLoaded, setPdfJsLoaded] = useState(false)
   const [pdfJsError, setPdfJsError] = useState(false)
   const [processingStatus, setProcessingStatus] = useState<string>("")
+  const [progress, setProgress] = useState<number>(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const errorTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const successTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
-  // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
       if (errorTimeoutRef.current) clearTimeout(errorTimeoutRef.current)
@@ -36,7 +47,6 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
     }
   }, [])
 
-  // Load PDF.js library with retry mechanism
   useEffect(() => {
     if (window.pdfjsLib) {
       setPdfJsLoaded(true)
@@ -141,18 +151,24 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
     }
   }
 
-  const convertPDFPagesToImages = async (arrayBuffer: ArrayBuffer): Promise<string[]> => {
+  // Efficient chunked image conversion
+  const convertPDFPagesToImagesChunked = async (
+    arrayBuffer: ArrayBuffer,
+    onProgress?: (current: number, total: number) => void
+  ): Promise<string[]> => {
     if (!window.pdfjsLib || !pdfJsLoaded) {
       throw new Error('PDF.js library not available')
     }
 
     let pdf = null
-    const images: string[] = []
+    const allImages: string[] = []
 
     try {
       const loadingTask = window.pdfjsLib.getDocument({ 
         data: arrayBuffer,
-        verbosity: 0
+        verbosity: 0,
+        isEvalSupported: false,
+        useSystemFonts: true
       })
       
       pdf = await loadingTask.promise
@@ -162,7 +178,6 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
         throw new Error('PDF has no pages')
       }
 
-      // Apply page limit if specified, otherwise process all pages
       const pagesToProcess = maxPdfPages ? Math.min(numPages, maxPdfPages) : numPages
       
       if (maxPdfPages && numPages > maxPdfPages) {
@@ -171,40 +186,78 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
         setProcessingStatus(`Converting ${numPages} pages...`)
       }
 
-      for (let pageNum = 1; pageNum <= pagesToProcess; pageNum++) {
-        try {
-          setProcessingStatus(`Processing page ${pageNum}/${pagesToProcess}...`)
-          
-          const page = await pdf.getPage(pageNum)
-          const viewport = page.getViewport({ scale: 2.0 })
-          
-          const canvas = document.createElement('canvas')
-          const context = canvas.getContext('2d', { willReadFrequently: false })
-          
-          if (!context) {
-            console.error(`Failed to get canvas context for page ${pageNum}`)
-            continue
-          }
+      // Process in chunks to avoid memory spikes
+      for (let startPage = 1; startPage <= pagesToProcess; startPage += chunkSize) {
+        const endPage = Math.min(startPage + chunkSize - 1, pagesToProcess)
+        const chunkPromises = []
 
-          canvas.height = viewport.height
-          canvas.width = viewport.width
+        for (let pageNum = startPage; pageNum <= endPage; pageNum++) {
+          chunkPromises.push(
+            (async () => {
+              let page = null
+              try {
+                page = await pdf.getPage(pageNum)
+                const viewport = page.getViewport({ scale: imageScale })
+                
+                const canvas = document.createElement('canvas')
+                const context = canvas.getContext('2d', { 
+                  willReadFrequently: false,
+                  alpha: false
+                })
+                
+                if (!context) {
+                  return null
+                }
 
-          await page.render({
-            canvasContext: context,
-            viewport: viewport
-          }).promise
+                canvas.height = viewport.height
+                canvas.width = viewport.width
 
-          const imageData = canvas.toDataURL('image/jpeg', 0.85)
-          images.push(imageData)
-          
-          page.cleanup()
-        } catch (pageErr) {
-          console.warn(`Error processing page ${pageNum}:`, pageErr)
+                await page.render({
+                  canvasContext: context,
+                  viewport: viewport,
+                  intent: 'display'
+                }).promise
+
+                const imageData = canvas.toDataURL('image/jpeg', imageQuality)
+                
+                return imageData
+              } catch (pageErr) {
+                console.warn(`Error processing page ${pageNum}:`, pageErr)
+                return null
+              } finally {
+                if (page) {
+                  try {
+                    page.cleanup()
+                  } catch (e) {
+                    // Silent cleanup
+                  }
+                }
+              }
+            })()
+          )
         }
+
+        const chunkResults = await Promise.all(chunkPromises)
+        
+        // Filter out nulls and add to results
+        chunkResults.forEach(img => {
+          if (img) allImages.push(img)
+        })
+
+        // Update progress
+        if (onProgress) {
+          onProgress(Math.min(endPage, pagesToProcess), pagesToProcess)
+        }
+        setProcessingStatus(`Converted ${Math.min(endPage, pagesToProcess)}/${pagesToProcess} pages...`)
+        setProgress(Math.round((Math.min(endPage, pagesToProcess) / pagesToProcess) * 100))
+
+        // Allow UI to update
+        await new Promise(resolve => setTimeout(resolve, 0))
       }
 
       setProcessingStatus("")
-      return images
+      setProgress(0)
+      return allImages
 
     } catch (err) {
       throw new Error(`PDF conversion failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
@@ -219,6 +272,7 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
     }
   }
 
+  // Efficient text extraction with array building
   const extractTextFromPDF = async (arrayBuffer: ArrayBuffer): Promise<string> => {
     if (!window.pdfjsLib || !pdfJsLoaded) {
       throw new Error('PDF.js library not available')
@@ -229,69 +283,94 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
     try {
       const loadingTask = window.pdfjsLib.getDocument({ 
         data: arrayBuffer,
-        verbosity: 0
+        verbosity: 0,
+        isEvalSupported: false,
+        useSystemFonts: true
       })
       
       pdf = await loadingTask.promise
       
-      // Apply page limit if specified, otherwise process all pages
       const numPages = maxPdfPages ? Math.min(pdf.numPages, maxPdfPages) : pdf.numPages
-      let fullText = ''
+      const textChunks: string[] = []
 
-      for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-        try {
-          setProcessingStatus(`Extracting text from page ${pageNum}/${numPages}...`)
-          
-          const page = await pdf.getPage(pageNum)
-          const textContent = await page.getTextContent()
-          
-          if (!textContent?.items || textContent.items.length === 0) {
-            page.cleanup()
-            continue
-          }
+      // Process text in chunks
+      for (let startPage = 1; startPage <= numPages; startPage += chunkSize) {
+        const endPage = Math.min(startPage + chunkSize - 1, numPages)
+        const chunkPromises = []
 
-          const sortedItems = textContent.items
-            .filter((item: any) => item.str && item.transform)
-            .sort((a: any, b: any) => {
-              const yDiff = Math.abs(a.transform[5] - b.transform[5])
-              if (yDiff > 5) {
-                return b.transform[5] - a.transform[5]
+        for (let pageNum = startPage; pageNum <= endPage; pageNum++) {
+          chunkPromises.push(
+            (async () => {
+              let page = null
+              try {
+                setProcessingStatus(`Extracting text from page ${pageNum}/${numPages}...`)
+                setProgress(Math.round((pageNum / numPages) * 100))
+                
+                page = await pdf.getPage(pageNum)
+                const textContent = await page.getTextContent()
+                
+                if (!textContent?.items || textContent.items.length === 0) {
+                  return `--- Page ${pageNum} ---\n\n`
+                }
+
+                const sortedItems = textContent.items
+                  .filter((item: any) => item.str && item.transform)
+                  .sort((a: any, b: any) => {
+                    const yDiff = Math.abs(a.transform[5] - b.transform[5])
+                    if (yDiff > 5) {
+                      return b.transform[5] - a.transform[5]
+                    }
+                    return a.transform[4] - b.transform[4]
+                  })
+                
+                let lastY = -1
+                const pageTextParts: string[] = []
+                
+                sortedItems.forEach((item: any) => {
+                  try {
+                    const currentY = item.transform[5]
+                    
+                    if (lastY !== -1 && Math.abs(currentY - lastY) > 5) {
+                      pageTextParts.push('\n')
+                    } else if (pageTextParts.length > 0 && 
+                               !pageTextParts[pageTextParts.length - 1].endsWith(' ') && 
+                               !pageTextParts[pageTextParts.length - 1].endsWith('\n')) {
+                      pageTextParts.push(' ')
+                    }
+                    
+                    pageTextParts.push(item.str)
+                    lastY = currentY
+                  } catch (itemErr) {
+                    console.warn('Error processing text item:', itemErr)
+                  }
+                })
+                
+                return `--- Page ${pageNum} ---\n${pageTextParts.join('')}\n\n`
+                
+              } catch (pageErr) {
+                return `--- Page ${pageNum} ---\n[Error extracting text]\n\n`
+              } finally {
+                if (page) {
+                  try {
+                    page.cleanup()
+                  } catch (e) {
+                    // Silent cleanup
+                  }
+                }
               }
-              return a.transform[4] - b.transform[4]
-            })
-          
-          let lastY = -1
-          let pageText = ''
-          
-          sortedItems.forEach((item: any) => {
-            try {
-              const currentY = item.transform[5]
-              
-              if (lastY !== -1 && Math.abs(currentY - lastY) > 5) {
-                pageText += '\n'
-              }
-              
-              if (item.str && pageText.length > 0 && !pageText.endsWith(' ') && !pageText.endsWith('\n')) {
-                pageText += ' '
-              }
-              
-              pageText += item.str
-              lastY = currentY
-            } catch (itemErr) {
-              console.warn('Error processing text item:', itemErr)
-            }
-          })
-          
-          fullText += `--- Page ${pageNum} ---\n${pageText}\n\n`
-          
-          page.cleanup()
-          
-        } catch (pageErr) {
-          // Silent fail - continue with other pages
+            })()
+          )
         }
+
+        const chunkResults = await Promise.all(chunkPromises)
+        textChunks.push(...chunkResults)
+
+        // Allow UI to update
+        await new Promise(resolve => setTimeout(resolve, 0))
       }
 
-      return fullText.trim()
+      setProgress(0)
+      return textChunks.join('')
 
     } catch (err) {
       throw new Error(`Text extraction failed: ${err instanceof Error ? err.message : 'Unknown error'}`)
@@ -372,6 +451,7 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
     clearSuccess()
     setIsProcessing(true)
     setProcessingStatus("")
+    setProgress(0)
 
     const validation = validateFile(file)
     if (!validation.valid) {
@@ -428,9 +508,9 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
           throw new Error('PDF processing unavailable. Please try again or use a different file format.')
         }
 
-        const originalBuffer = await file.arrayBuffer()
+        const arrayBuffer = await file.arrayBuffer()
         
-        if (originalBuffer.byteLength === 0) {
+        if (arrayBuffer.byteLength === 0) {
           throw new Error('PDF file is empty or corrupted')
         }
 
@@ -438,16 +518,16 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
         let images: string[] = []
 
         try {
-          const textBuffer = originalBuffer.slice(0)
           setProcessingStatus("Extracting text from PDF...")
-          extractedText = await extractTextFromPDF(textBuffer)
+          extractedText = await extractTextFromPDF(arrayBuffer)
         } catch (textErr) {
-          // Continue to image conversion silently
+          console.warn('Text extraction failed:', textErr)
         }
 
         try {
-          const imageBuffer = originalBuffer.slice(0)
-          images = await convertPDFPagesToImages(imageBuffer)
+          images = await convertPDFPagesToImagesChunked(arrayBuffer, (current, total) => {
+            setProgress(Math.round((current / total) * 100))
+          })
         } catch (imgErr) {
           if (!extractedText) {
             throw new Error('Failed to process PDF: Could not extract text or convert pages to images')
@@ -513,6 +593,7 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
     } finally {
       setIsProcessing(false)
       setProcessingStatus("")
+      setProgress(0)
       abortControllerRef.current = null
     }
   }
@@ -523,6 +604,7 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
     }
     setIsProcessing(false)
     setProcessingStatus("")
+    setProgress(0)
     clearError()
   }
 
@@ -580,6 +662,14 @@ export default function FileUpload({ onFileSelect, onImagesExtracted, onPdfImage
             <FileImage size={14} className="flex-shrink-0 mt-0.5 animate-pulse" />
             <div className="flex-1 min-w-0">
               <span className="break-words">{processingStatus}</span>
+              {progress > 0 && (
+                <div className="mt-1 w-full bg-blue-950 rounded-full h-1.5">
+                  <div 
+                    className="bg-blue-400 h-1.5 rounded-full transition-all duration-300"
+                    style={{ width: `${progress}%` }}
+                  />
+                </div>
+              )}
             </div>
             <button
               onClick={(e) => {
