@@ -1,19 +1,38 @@
 "use client"
 
 import type React from "react"
-import QuizMode from "./quiz-mode"
-import { FileText, X, ArrowUp, Brain, ChevronDown, ChevronUp, Plus, Image as ImageIcon, FileUp, Sparkles } from "lucide-react"
 import { useState, useRef, useEffect } from "react"
+
+// Icons
+import { 
+  FileText, 
+  X, 
+  ArrowUp, 
+  Brain, 
+  ChevronDown, 
+  ChevronUp, 
+  Plus, 
+  Image as ImageIcon, 
+  FileUp, 
+  Sparkles, 
+  GripVertical 
+} from "lucide-react"
+
+// UI Components
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
+
+// Custom Components
 import MessageBubble from "./message-bubble"
 import ImageUpload from "./image-upload"
 import VoiceInput from "./voice-input"
-import CodeEditor from "./code-editor"
+import StudyPDFInterface from "./study-pdf-interface"
+import QuizMode from "./quiz-mode"
 import LessonCard from "./lesson-card"
-import { GripVertical } from "lucide-react"
 import FileUpload from "./file-upload"
 import ModelSelector from "./model-selector"
+import CodeEditor from "./code-editor"
+
 
 // Updated Message interface with image support
 interface Message {
@@ -957,9 +976,10 @@ Format as JSON with this structure:
     )
   }
 
+  // Study Mode - PDF Interface
   if (studyMode) {
     return (
-      <div ref={containerRef} className="flex h-full bg-[#1E1E1E] text-white overflow-hidden">
+      <div className="relative h-full">
         {retryStatus.show && (
           <div className="fixed top-20 right-4 bg-[#2A2A2A] border border-yellow-600/50 rounded-lg p-3 shadow-xl z-50 max-w-xs animate-in slide-in-from-right duration-200">
             <div className="flex items-center gap-3">
@@ -1024,94 +1044,18 @@ Format as JSON with this structure:
             </div>
           </div>
         )}
-        <div style={{ width: `${dividerPos}%` }} className="flex flex-col overflow-hidden border-r border-[#2E2E2E]">
-          {quizMode && quizData ? (
-            <QuizMode quizData={quizData} onComplete={handleQuizComplete} topic={currentTopic} />
-          ) : lessonSteps.length > 0 ? (
-            <>
-              <LessonCard steps={lessonSteps} onComplete={handleLessonComplete} onCodeFeedback={handleCodeFeedback} />
-              <div className="border-t border-[#2E2E2E] bg-[#171717] p-3 md:p-4 flex-shrink-0">
-                <div className="flex flex-col gap-2">
-                  <label className="text-xs font-medium text-[#6B6B65] uppercase">Ask a follow-up question</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={followUpInput}
-                      onChange={(e) => setFollowUpInput(e.target.value)}
-                      onKeyDown={handleFollowUpKeyDown}
-                      placeholder="Ask about this concept..."
-                      className="flex-1 px-3 py-2 rounded-lg bg-[#222222] text-white placeholder-[#6B6B6B] border border-[#2E2E2E] focus:border-[#CC785C] focus:ring-1 focus:ring-[#CC785C] text-sm"
-                    />
-                    <button
-                      onClick={handleFollowUpQuestion}
-                      disabled={loading || !followUpInput.trim()}
-                      className="px-3 md:px-4 py-2 rounded-lg bg-[#CC785C] hover:bg-[#B8674A] text-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium flex-shrink-0"
-                    >
-                      Ask
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-2">
-                <div className="flex items-center justify-center h-full text-center px-4">
-                  <div>
-                    <h3 className="text-xl md:text-2xl font-semibold mb-2">Start Learning</h3>
-                    <p className="text-sm md:text-base text-[#8C8C8C]">
-                      Ask a coding question to begin your interactive lesson
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <ReasoningControls />
-              <div className="border-t border-[#2E2E2E] bg-[#171717] p-3 md:p-6 flex-shrink-0">
-                <div className="flex flex-col md:flex-row gap-2 md:gap-3">
-                  <div className="flex-1">
-                    <Textarea
-                      ref={textareaRef}
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={handleKeyDown}
-                      placeholder="Ask a coding question..."
-                      className="resize-none border-[#2E2E2E] bg-[#222222] text-white placeholder-[#6B6B6B] focus:ring-2 focus:ring-[#CC785C] rounded-lg text-sm md:text-base"
-                      rows={3}
-                    />
-                  </div>
-                  <Button
-                    onClick={handleSendMessage}
-                    disabled={loading || !input.trim()}
-                    className="bg-[#CC785C] hover:bg-[#B8674A] text-white rounded-lg px-4 md:px-6 py-2 md:py-3 h-auto md:self-end w-full md:w-auto"
-                  >
-                    Send
-                  </Button>
-                </div>
-              </div>
-            </>
-          )}
-        </div>
-        <div
-          onMouseDown={() => setIsDragging(true)}
-          className="w-1 bg-[#2E2E2E] hover:bg-[#CC785C] cursor-col-resize transition-colors flex items-center justify-center group"
-        >
-          <GripVertical
-            size={16}
-            className="text-[#6B6B65] group-hover:text-[#CC785C] opacity-0 group-hover:opacity-100"
-          />
-        </div>
-        <div style={{ width: `${100 - dividerPos}%` }} className="flex flex-col overflow-hidden">
-          <CodeEditor
-            language={codeLanguage}
-            onLanguageChange={setCodeLanguage}
-            onCodeFeedback={handleCodeFeedback}
-            onStartQuiz={handleStartQuiz}
-          />
-        </div>
+        <StudyPDFInterface
+          selectedModel={selectedModel}
+          onModelChange={onModelChange}
+          onTokenCountChange={onTokenCountChange}
+          messages={messages}
+          onMessagesChange={onMessagesChange}
+        />
       </div>
     )
   }
 
+  // Regular Chat Mode
   return (
     <div className="flex flex-col h-full bg-[#1E1E1E] text-white overflow-hidden">
       {retryStatus.show && (
