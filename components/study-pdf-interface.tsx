@@ -309,7 +309,7 @@ function Message({ message, onRetry }: { message: any; onRetry?: () => void }) {
               <div className="mt-3 pt-3 border-t border-[#2E2E2E] flex items-center gap-2 flex-wrap">
                 <BookOpen size={12} className="text-[#CC785C]" />
                 <span className="text-xs text-[#6B6B65]">Referenced pages:</span>
-                {message.citations.map((cite, i) => (
+                {message.citations.map((cite: number, i) => (
                   <span key={i} className="text-xs px-2 py-0.5 bg-[#2A2A2A] rounded text-[#CC785C] border border-[#3A3A3A]">
                     {cite}
                   </span>
