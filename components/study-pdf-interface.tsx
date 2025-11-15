@@ -862,7 +862,18 @@ Provide your answer:`
     }
   }
 
+  // Render loading states and main UI
   if (processingPDF) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-[#1A1A1A]">
+        <div className="text-center">
+          <Loader2 className="w-14 h-14 animate-spin text-[#AB7C5F] mx-auto mb-4" />
+          <p className="text-[#E8E8E3] text-lg font-medium">Processing PDF...</p>
+          <p className="text-[#6B6B65] text-sm mt-2">Extracting text and preparing document</p>
+        </div>
+      </div>
+    )
+  }
     return (
       <div className="flex items-center justify-center h-screen bg-[#1A1A1A]">
         <div className="text-center">
