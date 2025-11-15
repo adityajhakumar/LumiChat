@@ -11,11 +11,12 @@ interface FileUploadProps {
   imageQuality?: number
 }
 
-declare global {
-  interface Window {
-    pdfjsLib: any
-  }
-}
+// REMOVED - This duplicate declaration causes the TypeScript error
+// declare global {
+//   interface Window {
+//     pdfjsLib: any
+//   }
+// }
 
 export default function FileUpload({ 
   onFileSelect, 
@@ -56,7 +57,7 @@ export default function FileUpload({
   }, [chunkSize])
 
   useEffect(() => {
-    if (window.pdfjsLib) {
+    if (typeof window !== 'undefined' && (window as any).pdfjsLib) {
       setPdfJsLoaded(true)
       return
     }
@@ -71,8 +72,8 @@ export default function FileUpload({
       
       script.onload = () => {
         try {
-          if (window.pdfjsLib) {
-            window.pdfjsLib.GlobalWorkerOptions.workerSrc = 
+          if (typeof window !== 'undefined' && (window as any).pdfjsLib) {
+            (window as any).pdfjsLib.GlobalWorkerOptions.workerSrc = 
               'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
             setPdfJsLoaded(true)
             setPdfJsError(false)
@@ -162,16 +163,17 @@ export default function FileUpload({
   const convertPDFPagesToImagesOptimized = async (
     arrayBuffer: ArrayBuffer
   ): Promise<string[]> => {
-    if (!window.pdfjsLib || !pdfJsLoaded) {
+    if (typeof window === 'undefined' || !(window as any).pdfjsLib || !pdfJsLoaded) {
       throw new Error('PDF.js library not available')
     }
 
+    const pdfjsLib = (window as any).pdfjsLib
     let pdf = null
     const allImages: string[] = []
     let totalProcessed = 0
 
     try {
-      const loadingTask = window.pdfjsLib.getDocument({ 
+      const loadingTask = pdfjsLib.getDocument({ 
         data: arrayBuffer,
         verbosity: 0,
         isEvalSupported: false,
@@ -291,14 +293,15 @@ export default function FileUpload({
 
   // Optimized text extraction with intelligent spacing
   const extractTextFromPDFOptimized = async (arrayBuffer: ArrayBuffer): Promise<string> => {
-    if (!window.pdfjsLib || !pdfJsLoaded) {
+    if (typeof window === 'undefined' || !(window as any).pdfjsLib || !pdfJsLoaded) {
       throw new Error('PDF.js library not available')
     }
 
+    const pdfjsLib = (window as any).pdfjsLib
     let pdf = null
 
     try {
-      const loadingTask = window.pdfjsLib.getDocument({ 
+      const loadingTask = pdfjsLib.getDocument({ 
         data: arrayBuffer,
         verbosity: 0,
         isEvalSupported: false,
