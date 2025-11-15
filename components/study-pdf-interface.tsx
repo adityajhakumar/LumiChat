@@ -1,9 +1,17 @@
 "use client"
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { FileUp, X, Send, Sparkles, BookOpen, Loader2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, Maximize2, GripVertical, FileText, AlertCircle, MessageSquare, Bot, Camera, ExternalLink } from 'lucide-react'
+import { FileUp, X, Send, Sparkles, BookOpen, Loader2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, Maximize2, GripVertical, FileText, AlertCircle, MessageSquare, Bot, Camera, ExternalLink, Copy, Check } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+
+// Declare Prism global
+declare global {
+  interface Window {
+    Prism?: any
+    __prismLoaded?: boolean
+  }
+}
 
 // Model configurations - All multimodal models for better fallback
 const MODELS = [
@@ -18,7 +26,113 @@ const MODELS = [
   { id: "meta-llama/llama-4-scout:free", name: "Llama 4 Scout", provider: "Meta" },
 ]
 
-// Markdown Components with Claude-like styling
+// CodeBlock Component with Prism syntax highlighting
+function CodeBlock({ code, language = "javascript" }: { code: string; language?: string }) {
+  const codeRef = useRef<HTMLElement>(null)
+  const [copied, setCopied] = useState(false)
+
+  useEffect(() => {
+    const loadPrism = async () => {
+      if (typeof window === "undefined") return
+
+      // Only load once
+      if (!window.__prismLoaded) {
+        const link = document.createElement("link")
+        link.rel = "stylesheet"
+        link.href = "https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css"
+        document.head.appendChild(link)
+
+        const script = document.createElement("script")
+        script.src = "https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"
+        script.onload = () => {
+          window.__prismLoaded = true
+          const langs = [
+            "python", "javascript", "typescript", "jsx", "tsx", "css", "markup",
+            "json", "bash", "sql", "java", "cpp", "c", "csharp", "go", "rust",
+            "ruby", "php", "arduino"
+          ]
+          langs.forEach((lang) => {
+            const langScript = document.createElement("script")
+            langScript.src = `https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-${lang}.min.js`
+            document.head.appendChild(langScript)
+          })
+        }
+        document.head.appendChild(script)
+      }
+
+      // Wait for scripts, then highlight
+      const tryHighlight = () => {
+        if (window.Prism && codeRef.current) {
+          window.Prism.highlightElement(codeRef.current)
+        } else {
+          requestAnimationFrame(tryHighlight)
+        }
+      }
+      tryHighlight()
+    }
+
+    loadPrism()
+  }, [code, language])
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(code)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  const langMap: Record<string, string> = {
+    js: "javascript",
+    ts: "typescript",
+    py: "python",
+    rb: "ruby",
+    sh: "bash",
+    yml: "yaml",
+    md: "markdown",
+    html: "markup",
+    xml: "markup",
+  }
+
+  const prismLang = langMap[language.toLowerCase()] || language.toLowerCase()
+
+  return (
+    <div className="relative bg-[#1A1A1A] rounded-lg overflow-hidden border border-[#3A3A3A] my-3">
+      <div className="flex justify-between items-center bg-[#252525] px-4 py-2 border-b border-[#3A3A3A]">
+        <span className="text-xs uppercase text-[#A0A0A0] font-medium">{language}</span>
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1.5 px-2 py-1 text-xs rounded-md bg-[#2A2A2A] hover:bg-[#353535] text-[#A0A0A0] hover:text-[#ECECEC] transition-colors"
+        >
+          {copied ? (
+            <>
+              <Check size={14} />
+              Copied!
+            </>
+          ) : (
+            <>
+              <Copy size={14} />
+              Copy
+            </>
+          )}
+        </button>
+      </div>
+      <div className="overflow-x-auto">
+        <pre className="!m-0 !p-4">
+          <code
+            ref={codeRef}
+            className={`language-${prismLang}`}
+            style={{
+              fontFamily: '"Fira Code", "Cascadia Code", "SF Mono", Menlo, Consolas, monospace',
+            }}
+          >
+            {code}
+          </code>
+        </pre>
+      </div>
+    </div>
+  )
+}
+
+// Markdown Components with Claude-like styling and syntax highlighting
 const MarkdownComponents = {
   h1: ({...props}: any) => <h1 className="text-2xl font-semibold mt-6 mb-4 text-[#E8E8E3] leading-tight" {...props} />,
   h2: ({...props}: any) => <h2 className="text-xl font-semibold mt-5 mb-3 text-[#E8E8E3] leading-tight" {...props} />,
@@ -27,12 +141,26 @@ const MarkdownComponents = {
   ul: ({...props}: any) => <ul className="list-disc list-outside mb-3 space-y-1 text-[#D4D4CF] pl-6 marker:text-[#6B6B65]" {...props} />,
   ol: ({...props}: any) => <ol className="list-decimal list-outside mb-3 space-y-1 text-[#D4D4CF] pl-6 marker:text-[#6B6B65]" {...props} />,
   li: ({...props}: any) => <li className="leading-[1.6] text-[15px] pl-1" {...props} />,
-  code: ({inline, ...props}: any) => 
-    inline 
-      ? <code className="bg-[#2A2A2A] px-1.5 py-0.5 rounded text-[#E8E8E3] text-[13.5px] font-mono" {...props} />
-      : <code className="block bg-[#1E1E1E] p-3 rounded-lg text-[#E8E8E3] text-[13.5px] font-mono overflow-x-auto mb-3 leading-[1.5] whitespace-pre-wrap break-words" {...props} />,
-  pre: ({...props}: any) => <pre className="mb-3 overflow-x-auto" {...props} />,
-  blockquote: ({...props}: any) => <blockquote className="border-l-3 border-[#D97757 ] pl-4 my-3 text-[#A8A8A3] leading-[1.65]" {...props} />,
+  code: ({inline, className, children, ...props}: any) => {
+    const match = /language-(\w+)/.exec(className || '')
+    const language = match ? match[1] : ''
+    
+    if (!inline && language) {
+      return <CodeBlock code={String(children).replace(/\n$/, '')} language={language} />
+    }
+    
+    return inline 
+      ? <code className="bg-[#2A2A2A] px-1.5 py-0.5 rounded text-[#E8E8E3] text-[13.5px] font-mono" {...props}>{children}</code>
+      : <CodeBlock code={String(children).replace(/\n$/, '')} language="text" />
+  },
+  pre: ({children, ...props}: any) => {
+    // Extract code from pre > code structure
+    if (children?.type === 'code') {
+      return children
+    }
+    return <pre className="mb-3 overflow-x-auto" {...props}>{children}</pre>
+  },
+  blockquote: ({...props}: any) => <blockquote className="border-l-3 border-[#AB7C5F] pl-4 my-3 text-[#A8A8A3] leading-[1.65]" {...props} />,
   strong: ({...props}: any) => <strong className="font-semibold text-[#E8E8E3]" {...props} />,
   em: ({...props}: any) => <em className="italic text-[#D4D4CF]" {...props} />,
   a: ({href, children, ...props}: any) => {
@@ -45,7 +173,7 @@ const MarkdownComponents = {
     return (
       <a 
         href={finalHref}
-        className="text-[#D97757 ] hover:text-[#C89070] underline decoration-1 underline-offset-2 hover:decoration-2 transition-all inline-flex items-center gap-1" 
+        className="text-[#AB7C5F] hover:text-[#C89070] underline decoration-1 underline-offset-2 hover:decoration-2 transition-all inline-flex items-center gap-1" 
         target={isExternal ? "_blank" : undefined}
         rel={isExternal ? "noopener noreferrer" : undefined}
         {...props}
@@ -221,7 +349,7 @@ function PDFViewer({ pdfUrl, currentPage, setCurrentPage, zoom, setZoom, rotatio
     return (
       <div className="h-full flex items-center justify-center bg-[#0F0F0F]">
         <div className="text-center">
-          <Loader2 className="w-10 h-10 animate-spin text-[#D97757 ] mx-auto mb-3" />
+          <Loader2 className="w-10 h-10 animate-spin text-[#AB7C5F] mx-auto mb-3" />
           <p className="text-[#9B9B95] text-sm">Loading PDF...</p>
         </div>
       </div>
@@ -319,7 +447,7 @@ function PDFViewer({ pdfUrl, currentPage, setCurrentPage, zoom, setZoom, rotatio
                 setCurrentPage(page)
               }
             }}
-            className="w-14 px-2 py-1 bg-[#2A2A2A] border border-[#3A3A3A] text-[#E8E8E3] rounded text-xs text-center focus:outline-none focus:border-[#D97757 ]"
+            className="w-14 px-2 py-1 bg-[#2A2A2A] border border-[#3A3A3A] text-[#E8E8E3] rounded text-xs text-center focus:outline-none focus:border-[#AB7C5F]"
           />
           <span className="text-xs text-[#6B6B65]">of {totalPages}</span>
         </div>
@@ -354,7 +482,7 @@ function Message({ message, onRetry }: { message: Message; onRetry?: () => void 
     <div className="flex justify-start mb-6 animate-fadeIn">
       <div className="max-w-[85%]">
         <div className="flex items-start gap-3">
-          <div className={`w-7 h-7 rounded-full ${isError ? 'bg-red-500/20 border-2 border-red-500/50' : 'bg-gradient-to-br from-[#D97757 ] to-[#8B6B52]'} flex items-center justify-center flex-shrink-0 mt-1`}>
+          <div className={`w-7 h-7 rounded-full ${isError ? 'bg-red-500/20 border-2 border-red-500/50' : 'bg-gradient-to-br from-[#AB7C5F] to-[#8B6B52]'} flex items-center justify-center flex-shrink-0 mt-1`}>
             {isError ? <AlertCircle size={16} className="text-red-400" /> : <Bot size={16} className="text-white" />}
           </div>
           <div className="flex-1 min-w-0">
@@ -368,10 +496,10 @@ function Message({ message, onRetry }: { message: Message; onRetry?: () => void 
             </div>
             {message.citations && message.citations.length > 0 && (
               <div className="mt-3 pt-3 border-t border-[#2E2E2E] flex items-center gap-2 flex-wrap">
-                <BookOpen size={12} className="text-[#D97757]" />
+                <BookOpen size={12} className="text-[#AB7C5F]" />
                 <span className="text-xs text-[#6B6B65]">Referenced pages:</span>
                 {message.citations.map((cite: number, i: number) => (
-                  <span key={i} className="text-xs px-2 py-0.5 bg-[#2A2A2A] rounded text-[#D97757] border border-[#3A3A3A]">
+                  <span key={i} className="text-xs px-2 py-0.5 bg-[#2A2A2A] rounded text-[#AB7C5F] border border-[#3A3A3A]">
                     {cite}
                   </span>
                 ))}
@@ -386,7 +514,7 @@ function Message({ message, onRetry }: { message: Message; onRetry?: () => void 
             {isError && onRetry && (
               <button
                 onClick={onRetry}
-                className="mt-3 px-3 py-1.5 bg-[#D97757] hover:bg-[#8B6B52] text-white text-xs rounded-md transition-colors flex items-center gap-1.5"
+                className="mt-3 px-3 py-1.5 bg-[#AB7C5F] hover:bg-[#8B6B52] text-white text-xs rounded-md transition-colors flex items-center gap-1.5"
               >
                 <RotateCw size={12} />
                 Retry
@@ -807,6 +935,17 @@ export default function StudyPDFInterface() {
       } else {
         // Use semantic search for general questions
         relevantChunks = findRelevantChunks(userQuestion, pdfChunks, 5)
+        
+        // IMPORTANT: Always include current visible page for context
+        // This ensures the AI can see what the user is looking at
+        const currentPageChunks = pdfChunks.filter(chunk => chunk.pageNumber === currentPage)
+        
+        // Add current page chunks if not already included
+        currentPageChunks.forEach(chunk => {
+          if (!relevantChunks.find(c => c.pageNumber === chunk.pageNumber && c.text === chunk.text)) {
+            relevantChunks.push(chunk)
+          }
+        })
       }
       
       // Fallback: if no relevant chunks found, use current page context
@@ -824,22 +963,38 @@ export default function StudyPDFInterface() {
 
       // Check if we need to include images for better context
       imagePagesToSend = []
-      if (pdfFile.images && pdfFile.images.length > 0 && pdfFile.isImageHeavy) {
-        citations.forEach(pageNum => {
-          const page = pdfFile.pages.find(p => p.pageNumber === pageNum)
-          if (page?.hasImage && pdfFile.images) {
-            // Get the image for this page (images are stored in order)
-            const imageIndex = pdfFile.pages
-              .filter(p => p.hasImage)
-              .findIndex(p => p.pageNumber === pageNum)
-            if (imageIndex >= 0 && imageIndex < pdfFile.images.length) {
-              imagePagesToSend.push(pdfFile.images[imageIndex])
-            }
+      if (pdfFile.images && pdfFile.images.length > 0) {
+        // Always try to include the current visible page image
+        const currentPageData = pdfFile.pages.find(p => p.pageNumber === currentPage)
+        if (currentPageData?.hasImage) {
+          const imageIndex = pdfFile.pages
+            .filter(p => p.hasImage)
+            .findIndex(p => p.pageNumber === currentPage)
+          if (imageIndex >= 0 && imageIndex < pdfFile.images.length) {
+            imagePagesToSend.push(pdfFile.images[imageIndex])
           }
-        })
+        }
+        
+        // Also include images from other cited pages if image-heavy document
+        if (pdfFile.isImageHeavy) {
+          citations.forEach(pageNum => {
+            if (pageNum === currentPage) return // Already added
+            const page = pdfFile.pages.find(p => p.pageNumber === pageNum)
+            if (page?.hasImage && pdfFile.images) {
+              const imageIndex = pdfFile.pages
+                .filter(p => p.hasImage)
+                .findIndex(p => p.pageNumber === pageNum)
+              if (imageIndex >= 0 && imageIndex < pdfFile.images.length && imagePagesToSend.length < 4) {
+                imagePagesToSend.push(pdfFile.images[imageIndex])
+              }
+            }
+          })
+        }
       }
 
       let prompt = `You are a helpful PDF study assistant analyzing "${pdfFile.name}".
+
+The user is currently viewing PAGE ${currentPage} of the document.
 
 Here is the relevant content from the document:
 
@@ -849,10 +1004,21 @@ User Question: ${userQuestion}
 
 Instructions:
 - Answer based on BOTH the text context above AND the images provided (if any)
-- Use markdown formatting for clarity
+- Pay special attention to content from page ${currentPage} since that's what the user is currently viewing
+- **CRITICAL: When displaying code, ALWAYS wrap it in markdown code blocks with the language specified**
+  Example: \`\`\`cpp\n// code here\n\`\`\`
+  Example: \`\`\`python\n# code here\n\`\`\`
+  Example: \`\`\`javascript\n// code here\n\`\`\`
+- Use proper markdown formatting:
+  - Headers: # ## ###
+  - Bold: **text**
+  - Lists: - or 1.
+  - Code blocks: \`\`\`language\n...\n\`\`\`
+  - Inline code: \`code\`
 - Be specific and reference page numbers when appropriate
-- If images are provided, analyze their visual content in detail
-- Describe what you see in the images and how it relates to the question
+- If images are provided, analyze their visual content in detail and extract any code you see
+- If the question asks about "this page" or "what code", refer to page ${currentPage}
+- When explaining code, break it down section by section with clear explanations
 - If you need to see different pages, ask the user to specify
 
 Provide your answer:`
@@ -860,12 +1026,68 @@ Provide your answer:`
       // Call API with images if available
       const content = await callAPI(prompt, imagePagesToSend.length > 0 ? imagePagesToSend : undefined)
 
+      // Post-process: Ensure code snippets are properly formatted
+      let formattedContent = content
+      
+      // Detect common code patterns and wrap them if not already in code blocks
+      if (!formattedContent.includes('```')) {
+        // Check for Arduino/C/C++ style code patterns
+        const codePatterns = [
+          /\b(digitalWrite|pinMode|delay|Serial\.|if|while|for)\s*\(/gi,
+          /\b(int|void|float|char|const)\s+\w+\s*[=;(]/gi,
+        ]
+        
+        const hasCode = codePatterns.some(pattern => pattern.test(formattedContent))
+        
+        if (hasCode) {
+          // Try to extract and format code sections
+          const lines = formattedContent.split('\n')
+          let inCodeBlock = false
+          let codeLines: string[] = []
+          const newLines: string[] = []
+          
+          lines.forEach((line, index) => {
+            const isCodeLine = /^\s*(digitalWrite|pinMode|delay|if|while|for|int|void|return|Serial|\/\/)/i.test(line) ||
+                              /[{};]$/.test(line.trim()) ||
+                              (inCodeBlock && line.trim().length > 0 && !line.match(/^[#*-]/))
+            
+            if (isCodeLine && !inCodeBlock) {
+              inCodeBlock = true
+              codeLines = [line]
+            } else if (isCodeLine && inCodeBlock) {
+              codeLines.push(line)
+            } else if (!isCodeLine && inCodeBlock) {
+              // End of code block
+              newLines.push('```cpp')
+              newLines.push(...codeLines)
+              newLines.push('```')
+              newLines.push(line)
+              inCodeBlock = false
+              codeLines = []
+            } else {
+              newLines.push(line)
+            }
+            
+            // Handle last line
+            if (index === lines.length - 1 && inCodeBlock) {
+              newLines.push('```cpp')
+              newLines.push(...codeLines)
+              newLines.push('```')
+            }
+          })
+          
+          if (newLines.length > 0) {
+            formattedContent = newLines.join('\n')
+          }
+        }
+      }
+
       // Remove temporary "analyzing" message if it exists
       setMessages(prev => {
         const filtered = prev.filter(m => !m.content.includes('🔍 Analyzing document'))
         return [...filtered, {
           role: 'assistant',
-          content,
+          content: formattedContent,
           isUser: false,
           citations: citations.length > 0 ? citations : undefined,
           hasImages: imagePagesToSend.length > 0
@@ -924,7 +1146,7 @@ Provide your answer:`
     return (
       <div className="flex items-center justify-center h-full bg-[#1A1A1A]">
         <div className="text-center">
-          <Loader2 className="w-14 h-14 animate-spin text-[#D97757] mx-auto mb-4" />
+          <Loader2 className="w-14 h-14 animate-spin text-[#AB7C5F] mx-auto mb-4" />
           <p className="text-[#E8E8E3] text-lg font-medium">Processing PDF...</p>
           <p className="text-[#6B6B65] text-sm mt-2">Extracting text and preparing document</p>
         </div>
@@ -937,14 +1159,14 @@ Provide your answer:`
       <div className="flex items-center justify-center h-full bg-[#1A1A1A]">
         <div className="text-center px-4 max-w-md">
           <div className="w-20 h-20 rounded-full bg-[#2A2A2A] border-2 border-[#3A3A3A] flex items-center justify-center mx-auto mb-6">
-            <FileUp size={40} className="text-[#D97757]" />
+            <FileUp size={40} className="text-[#AB7C5F]" />
           </div>
           <h2 className="text-2xl font-semibold text-[#E8E8E3] mb-2">Upload PDF Document</h2>
           <p className="text-[#9B9B95] mb-6">Upload any PDF and chat with it using AI</p>
           
           <button
             onClick={() => fileInputRef.current?.click()}
-            className="px-6 py-3 bg-gradient-to-r from-[#D97757] to-[#8B6B52] hover:from-[#8B6B52] hover:to-[#7B5B42] text-white rounded-lg font-medium transition-all transform hover:scale-105"
+            className="px-6 py-3 bg-gradient-to-r from-[#AB7C5F] to-[#8B6B52] hover:from-[#8B6B52] hover:to-[#7B5B42] text-white rounded-lg font-medium transition-all transform hover:scale-105"
           >
             Choose PDF File
           </button>
@@ -976,7 +1198,7 @@ Provide your answer:`
         {/* Header */}
         <div className="border-b border-[#2E2E2E] bg-[#171717] px-4 py-3 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-3">
-            <FileText size={18} className="text-[#D97757]" />
+            <FileText size={18} className="text-[#AB7C5F]" />
             <div className="flex flex-col">
               <span className="text-sm font-semibold text-[#E8E8E3] truncate max-w-[200px]">{pdfFile.name}</span>
               <div className="flex items-center gap-2">
@@ -1016,7 +1238,7 @@ Provide your answer:`
             disabled={loading}
             className="px-3 py-1.5 rounded-md bg-[#2A2A2A] hover:bg-[#353535] text-[#E8E8E3] text-xs whitespace-nowrap transition-colors disabled:opacity-50 flex items-center gap-1.5 border border-[#3A3A3A]"
           >
-            <Sparkles size={14} className="text-[#D97757]" />
+            <Sparkles size={14} className="text-[#AB7C5F]" />
             Summarize
           </button>
           <button
@@ -1027,7 +1249,7 @@ Provide your answer:`
             disabled={loading}
             className="px-3 py-1.5 rounded-md bg-[#2A2A2A] hover:bg-[#353535] text-[#E8E8E3] text-xs whitespace-nowrap transition-colors disabled:opacity-50 flex items-center gap-1.5 border border-[#3A3A3A]"
           >
-            <BookOpen size={14} className="text-[#D97757]" />
+            <BookOpen size={14} className="text-[#AB7C5F]" />
             Explain Page {currentPage}
           </button>
         </div>
@@ -1037,7 +1259,7 @@ Provide your answer:`
           {messages.length === 0 ? (
             <div className="flex items-center justify-center h-full">
               <div className="text-center max-w-md">
-                <MessageSquare className="w-12 h-12 text-[#D97757] mx-auto mb-4 opacity-50" />
+                <MessageSquare className="w-12 h-12 text-[#AB7C5F] mx-auto mb-4 opacity-50" />
                 <h3 className="text-lg font-semibold text-[#E8E8E3] mb-2">Start a Conversation</h3>
                 <p className="text-sm text-[#9B9B95] mb-4">Ask questions about your PDF document</p>
                 <div className="grid gap-2">
@@ -1061,14 +1283,14 @@ Provide your answer:`
               {loading && (
                 <div className="flex justify-start mb-6 animate-fadeIn">
                   <div className="flex items-start gap-3">
-                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#D97757] to-[#8B6B52] flex items-center justify-center flex-shrink-0 mt-1">
+                    <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#AB7C5F] to-[#8B6B52] flex items-center justify-center flex-shrink-0 mt-1">
                       <Bot size={16} className="text-white" />
                     </div>
                     <div className="bg-[#2A2A2A] rounded-2xl px-4 py-3 border border-[#3A3A3A]">
                       <div className="flex space-x-2">
-                        <div className="w-2 h-2 bg-[#D97757] rounded-full animate-bounce"></div>
-                        <div className="w-2 h-2 bg-[#D97757] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-2 h-2 bg-[#D97757] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        <div className="w-2 h-2 bg-[#AB7C5F] rounded-full animate-bounce"></div>
+                        <div className="w-2 h-2 bg-[#AB7C5F] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                        <div className="w-2 h-2 bg-[#AB7C5F] rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                       </div>
                     </div>
                   </div>
@@ -1089,13 +1311,13 @@ Provide your answer:`
               onKeyDown={handleKeyDown}
               placeholder="Ask anything about this document..."
               disabled={loading}
-              className="resize-none bg-[#2A2A2A] border border-[#3A3A3A] text-[#E8E8E3] placeholder-[#6B6B6B] focus:border-[#D97757] focus:outline-none rounded-lg text-[15px] flex-1 px-3 py-2 max-h-[120px] disabled:opacity-50"
+              className="resize-none bg-[#2A2A2A] border border-[#3A3A3A] text-[#E8E8E3] placeholder-[#6B6B6B] focus:border-[#AB7C5F] focus:outline-none rounded-lg text-[15px] flex-1 px-3 py-2 max-h-[120px] disabled:opacity-50"
               rows={1}
             />
             <button
               onClick={handleSendMessage}
               disabled={loading || !input.trim()}
-              className="px-4 py-2 rounded-lg bg-[#D97757] hover:bg-[#8B6B52] text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center self-end"
+              className="px-4 py-2 rounded-lg bg-[#AB7C5F] hover:bg-[#8B6B52] text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center self-end"
             >
               {loading ? (
                 <Loader2 className="animate-spin" size={18} />
@@ -1112,11 +1334,11 @@ Provide your answer:`
 
       {/* Resizable Divider */}
       <div 
-        className="w-1 bg-[#2E2E2E] hover:bg-[#D97757 ] cursor-col-resize flex items-center justify-center group transition-colors relative"
+        className="w-1 bg-[#2E2E2E] hover:bg-[#AB7C5F] cursor-col-resize flex items-center justify-center group transition-colors relative"
         onMouseDown={handleMouseDown}
       >
         <div className="absolute inset-y-0 -left-1 -right-1" />
-        <GripVertical size={16} className="text-[#6B6B65] group-hover:text-[#D97757] transition-colors" />
+        <GripVertical size={16} className="text-[#6B6B65] group-hover:text-[#AB7C5F] transition-colors" />
       </div>
 
       {/* Right Panel - PDF Viewer */}
