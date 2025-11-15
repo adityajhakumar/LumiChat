@@ -1,9 +1,11 @@
 "use client"
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { FileUp, X, Send, Sparkles, BookOpen, Loader2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, GripVertical, FileText, AlertCircle, MessageSquare, Bot, Camera, ExternalLink, Copy, Check } from 'lucide-react'
+import { FileUp, X, Send, Sparkles, BookOpen, Loader2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, GripVertical, FileText, AlertCircle, MessageSquare, Bot, Camera, ExternalLink, Copy, Check, HelpCircle, Award, XCircle } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import remarkMath from 'remark-math'
+import rehypeKatex from 'rehype-katex'
 
 // Declare global types
 declare global {
@@ -11,13 +13,23 @@ declare global {
     Prism?: any
     __prismLoaded?: boolean
     pdfjsLib?: any
+    katex?: any
+    __katexLoaded?: boolean
   }
 }
 
-// Ensure this is treated as a module
 export {}
 
-// Model configurations - All multimodal models for better fallback
+// Quiz Question Interface
+interface QuizQuestion {
+  id: number
+  question: string
+  options: string[]
+  correct: number
+  explanation: string
+}
+
+// Model configurations
 const MODELS = [
   { id: "google/gemini-2.0-flash-exp:free", name: "Gemini 2.0 Flash", provider: "Google" },
   { id: "google/gemma-3n-e2b-it:free", name: "Gemma 3n E2B", provider: "Google" },
@@ -30,7 +42,7 @@ const MODELS = [
   { id: "meta-llama/llama-4-scout:free", name: "Llama 4 Scout", provider: "Meta" },
 ]
 
-// CodeBlock Component with FIXED Prism syntax highlighting
+// CodeBlock Component
 function CodeBlock({ code, language = "javascript" }: { code: string; language?: string }) {
   const codeRef = useRef<HTMLElement>(null)
   const [copied, setCopied] = useState(false)
@@ -43,15 +55,12 @@ function CodeBlock({ code, language = "javascript" }: { code: string; language?:
       if (typeof window === "undefined" || !mounted) return
 
       try {
-        // Only load once globally
         if (!window.__prismLoaded) {
-          // Load CSS
           const link = document.createElement("link")
           link.rel = "stylesheet"
           link.href = "https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css"
           document.head.appendChild(link)
 
-          // Load main Prism script and wait for it
           await new Promise<void>((resolve, reject) => {
             const script = document.createElement("script")
             script.src = "https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"
@@ -61,10 +70,8 @@ function CodeBlock({ code, language = "javascript" }: { code: string; language?:
             document.head.appendChild(script)
           })
 
-          // Wait for Prism to be fully initialized
           await new Promise(resolve => setTimeout(resolve, 150))
 
-          // Load language components SEQUENTIALLY to prevent race conditions
           const langs = ["python", "javascript", "typescript", "jsx", "tsx", "css", "markup", 
                         "json", "bash", "sql", "java", "cpp", "c", "csharp", "go", "rust", 
                         "ruby", "php"]
@@ -77,20 +84,17 @@ function CodeBlock({ code, language = "javascript" }: { code: string; language?:
                 langScript.src = `https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-${lang}.min.js`
                 langScript.crossOrigin = "anonymous"
                 langScript.onload = () => {
-                  setTimeout(() => resolve(), 50) // Small delay after each language loads
+                  setTimeout(() => resolve(), 50)
                 }
-                langScript.onerror = () => resolve() // Don't block on individual language failures
+                langScript.onerror = () => resolve()
                 document.head.appendChild(langScript)
               })
-            } catch {
-              // Continue loading other languages
-            }
+            } catch {}
           }
 
           window.__prismLoaded = true
         }
 
-        // Wait for Prism to be fully ready with proper language support
         let attempts = 0
         const maxAttempts = 50
         
@@ -98,7 +102,6 @@ function CodeBlock({ code, language = "javascript" }: { code: string; language?:
           return new Promise((resolve) => {
             const check = () => {
               attempts++
-              // Check if Prism and its languages object exist and are fully initialized
               if (window.Prism && 
                   window.Prism.languages && 
                   typeof window.Prism.highlightElement === 'function' &&
@@ -107,7 +110,7 @@ function CodeBlock({ code, language = "javascript" }: { code: string; language?:
               } else if (attempts < maxAttempts && mounted) {
                 setTimeout(check, 100)
               } else {
-                resolve() // Give up after max attempts
+                resolve()
               }
             }
             check()
@@ -116,14 +119,12 @@ function CodeBlock({ code, language = "javascript" }: { code: string; language?:
 
         await waitForPrism()
 
-        // Now highlight with additional safety checks
         if (window.Prism && 
             window.Prism.languages && 
             codeRef.current && 
             !highlighted && 
             mounted) {
           try {
-            // Map language aliases
             const langMap: Record<string, string> = {
               js: "javascript",
               ts: "typescript",
@@ -138,21 +139,17 @@ function CodeBlock({ code, language = "javascript" }: { code: string; language?:
             
             const prismLang = langMap[language.toLowerCase()] || language.toLowerCase()
             
-            // Verify the language exists before highlighting
             if (window.Prism.languages[prismLang]) {
               window.Prism.highlightElement(codeRef.current)
               setHighlighted(true)
             } else {
-              // Fallback to plain text highlighting
               setHighlighted(true)
             }
           } catch {
-            // Silently fail - code will display without syntax highlighting
             setHighlighted(true)
           }
         }
       } catch {
-        // Silent fallback - code displays without highlighting
         setHighlighted(true)
       }
     }
@@ -216,7 +213,7 @@ function CodeBlock({ code, language = "javascript" }: { code: string; language?:
             className={`language-${prismLang}`}
             style={{
               fontFamily: '"Fira Code", "Cascadia Code", "SF Mono", Menlo, Consolas, monospace',
-              color: highlighted ? undefined : '#E8E8E3', // Fallback color if not highlighted
+              color: highlighted ? undefined : '#E8E8E3',
             }}
           >
             {code}
@@ -227,7 +224,29 @@ function CodeBlock({ code, language = "javascript" }: { code: string; language?:
   )
 }
 
-// Markdown Components with Claude-like styling
+// Load KaTeX for math rendering
+const loadKaTeX = async () => {
+  if (typeof window === "undefined") return
+  
+  if (!window.__katexLoaded) {
+    const link = document.createElement("link")
+    link.rel = "stylesheet"
+    link.href = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
+    document.head.appendChild(link)
+    
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement("script")
+      script.src = "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"
+      script.onload = () => resolve()
+      script.onerror = () => reject(new Error("Failed to load KaTeX"))
+      document.head.appendChild(script)
+    })
+    
+    window.__katexLoaded = true
+  }
+}
+
+// Markdown Components with math support
 const MarkdownComponents = {
   h1: ({...props}: any) => <h1 className="text-2xl font-semibold mt-6 mb-4 text-[#E8E8E3] leading-tight" {...props} />,
   h2: ({...props}: any) => <h2 className="text-xl font-semibold mt-5 mb-3 text-[#E8E8E3] leading-tight" {...props} />,
@@ -303,6 +322,508 @@ interface PDFChunk {
   text: string;
   pageNumber: number;
   score?: number;
+}
+
+// Quiz Generation Modal Component
+function QuizGenerationModal({ 
+  onClose, 
+  onGenerate, 
+  totalPages 
+}: { 
+  onClose: () => void; 
+  onGenerate: (config: any) => void; 
+  totalPages: number 
+}) {
+  const [quizType, setQuizType] = useState<'document' | 'topic'>('document')
+  const [startPage, setStartPage] = useState(1)
+  const [endPage, setEndPage] = useState(Math.min(10, totalPages))
+  const [topic, setTopic] = useState('')
+  const [numQuestions, setNumQuestions] = useState(5)
+  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium')
+
+  const handleGenerate = () => {
+    if (quizType === 'document') {
+      if (startPage > endPage || startPage < 1 || endPage > totalPages) {
+        alert('Please enter valid page numbers')
+        return
+      }
+      onGenerate({
+        type: 'document',
+        startPage,
+        endPage,
+        numQuestions,
+        difficulty
+      })
+    } else {
+      if (!topic.trim()) {
+        alert('Please enter a topic')
+        return
+      }
+      onGenerate({
+        type: 'topic',
+        topic: topic.trim(),
+        numQuestions,
+        difficulty
+      })
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <div className="bg-[#1E1E1E] rounded-xl border border-[#3A3A3A] max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-[#2E2E2E]">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#AB7C5F] to-[#8B6B52] flex items-center justify-center">
+              <HelpCircle size={20} className="text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-[#E8E8E3]">Generate Quiz</h2>
+              <p className="text-sm text-[#6B6B65]">Customize your quiz settings</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-[#2A2A2A] rounded-lg transition-colors text-[#9B9B95]"
+          >
+            <X size={20} />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 space-y-6">
+          {/* Quiz Type Selection */}
+          <div>
+            <label className="block text-sm font-medium text-[#E8E8E3] mb-3">Quiz Source</label>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                onClick={() => setQuizType('document')}
+                className={`p-4 rounded-lg border-2 transition-all ${
+                  quizType === 'document'
+                    ? 'border-[#AB7C5F] bg-[#2A2A2A]'
+                    : 'border-[#3A3A3A] bg-[#1E1E1E] hover:border-[#4A4A4A]'
+                }`}
+              >
+                <BookOpen size={24} className={`mx-auto mb-2 ${quizType === 'document' ? 'text-[#AB7C5F]' : 'text-[#6B6B65]'}`} />
+                <div className="font-medium text-[#E8E8E3]">From Document</div>
+                <div className="text-xs text-[#6B6B65] mt-1">Quiz from specific pages</div>
+              </button>
+              <button
+                onClick={() => setQuizType('topic')}
+                className={`p-4 rounded-lg border-2 transition-all ${
+                  quizType === 'topic'
+                    ? 'border-[#AB7C5F] bg-[#2A2A2A]'
+                    : 'border-[#3A3A3A] bg-[#1E1E1E] hover:border-[#4A4A4A]'
+                }`}
+              >
+                <Sparkles size={24} className={`mx-auto mb-2 ${quizType === 'topic' ? 'text-[#AB7C5F]' : 'text-[#6B6B65]'}`} />
+                <div className="font-medium text-[#E8E8E3]">Custom Topic</div>
+                <div className="text-xs text-[#6B6B65] mt-1">Quiz on any topic</div>
+              </button>
+            </div>
+          </div>
+
+          {/* Document-based Settings */}
+          {quizType === 'document' && (
+            <div className="space-y-4 p-4 bg-[#0D0D0D] rounded-lg border border-[#2E2E2E]">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[#E8E8E3] mb-2">Start Page</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={totalPages}
+                    value={startPage}
+                    onChange={(e) => setStartPage(parseInt(e.target.value) || 1)}
+                    className="w-full px-3 py-2 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-[#E8E8E3] focus:outline-none focus:border-[#AB7C5F]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[#E8E8E3] mb-2">End Page</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max={totalPages}
+                    value={endPage}
+                    onChange={(e) => setEndPage(parseInt(e.target.value) || 1)}
+                    className="w-full px-3 py-2 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-[#E8E8E3] focus:outline-none focus:border-[#AB7C5F]"
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-[#6B6B65]">
+                Quiz will be generated from pages {startPage} to {endPage} (Total: {Math.max(0, endPage - startPage + 1)} pages)
+              </p>
+            </div>
+          )}
+
+          {/* Topic-based Settings */}
+          {quizType === 'topic' && (
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-[#E8E8E3]">Topic</label>
+              <input
+                type="text"
+                value={topic}
+                onChange={(e) => setTopic(e.target.value)}
+                placeholder="e.g., Quantum Mechanics, Machine Learning, etc."
+                className="w-full px-4 py-3 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg text-[#E8E8E3] placeholder-[#6B6B65] focus:outline-none focus:border-[#AB7C5F]"
+              />
+              <p className="text-xs text-[#6B6B65]">Enter a detailed topic for in-depth questions</p>
+            </div>
+          )}
+
+          {/* Number of Questions */}
+          <div>
+            <label className="block text-sm font-medium text-[#E8E8E3] mb-3">
+              Number of Questions: <span className="text-[#AB7C5F]">{numQuestions}</span>
+            </label>
+            <input
+              type="range"
+              min="3"
+              max="15"
+              value={numQuestions}
+              onChange={(e) => setNumQuestions(parseInt(e.target.value))}
+              className="w-full h-2 bg-[#2A2A2A] rounded-lg appearance-none cursor-pointer accent-[#AB7C5F]"
+            />
+            <div className="flex justify-between text-xs text-[#6B6B65] mt-1">
+              <span>3</span>
+              <span>15</span>
+            </div>
+          </div>
+
+          {/* Difficulty Level */}
+          <div>
+            <label className="block text-sm font-medium text-[#E8E8E3] mb-3">Difficulty Level</label>
+            <div className="grid grid-cols-3 gap-3">
+              {(['easy', 'medium', 'hard'] as const).map((level) => (
+                <button
+                  key={level}
+                  onClick={() => setDifficulty(level)}
+                  className={`px-4 py-3 rounded-lg border-2 transition-all capitalize ${
+                    difficulty === level
+                      ? 'border-[#AB7C5F] bg-[#2A2A2A] text-[#E8E8E3]'
+                      : 'border-[#3A3A3A] bg-[#1E1E1E] text-[#6B6B65] hover:border-[#4A4A4A]'
+                  }`}
+                >
+                  {level}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-[#2E2E2E]">
+          <button
+            onClick={onClose}
+            className="px-5 py-2.5 rounded-lg bg-[#2A2A2A] hover:bg-[#353535] text-[#E8E8E3] transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleGenerate}
+            className="px-5 py-2.5 rounded-lg bg-gradient-to-r from-[#AB7C5F] to-[#8B6B52] hover:from-[#8B6B52] hover:to-[#7B5B42] text-white font-medium transition-all"
+          >
+            Generate Quiz
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Quiz Mode Component
+function QuizMode({ 
+  questions, 
+  onComplete, 
+  topic 
+}: { 
+  questions: QuizQuestion[]; 
+  onComplete: () => void; 
+  topic?: string 
+}) {
+  const [currentQuestion, setCurrentQuestion] = useState(0)
+  const [selectedAnswers, setSelectedAnswers] = useState<{ [key: number]: number }>({})
+  const [showResults, setShowResults] = useState(false)
+
+  const question = questions[currentQuestion]
+  const isLastQuestion = currentQuestion === questions.length - 1
+  const hasAnswered = selectedAnswers[currentQuestion] !== undefined
+
+  const handleSelectAnswer = (optionIndex: number) => {
+    setSelectedAnswers({
+      ...selectedAnswers,
+      [currentQuestion]: optionIndex,
+    })
+  }
+
+  const handleNext = () => {
+    if (isLastQuestion) {
+      setShowResults(true)
+    } else {
+      setCurrentQuestion(currentQuestion + 1)
+    }
+  }
+
+  const handlePrevious = () => {
+    if (currentQuestion > 0) {
+      setCurrentQuestion(currentQuestion - 1)
+    }
+  }
+
+  const calculateScore = () => {
+    let correct = 0
+    questions.forEach((q, index) => {
+      if (selectedAnswers[index] === q.correct) {
+        correct++
+      }
+    })
+    return {
+      correct,
+      total: questions.length,
+      percentage: Math.round((correct / questions.length) * 100),
+    }
+  }
+
+  // Results screen
+  if (showResults) {
+    const score = calculateScore()
+    const passed = score.percentage >= 70
+
+    return (
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#1E1E1E]">
+        <div className="flex items-center justify-between p-6 border-b border-[#2E2E2E] flex-shrink-0">
+          <h2 className="text-xl font-bold text-[#E5E5E0]">Quiz Results</h2>
+          <button
+            onClick={onComplete}
+            className="p-2 hover:bg-[#2E2E2E] rounded-lg transition-colors text-[#9B9B95]"
+            title="Exit quiz"
+          >
+            <XCircle size={20} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-2xl mx-auto space-y-6">
+            {/* Score Card */}
+            <div
+              className={`p-8 rounded-xl border-2 ${
+                passed
+                  ? "bg-gradient-to-br from-green-900/20 to-green-800/10 border-green-600"
+                  : "bg-gradient-to-br from-orange-900/20 to-orange-800/10 border-orange-600"
+              }`}
+            >
+              <div className="flex items-center justify-center mb-4">
+                {passed ? (
+                  <Award size={64} className="text-green-400" />
+                ) : (
+                  <div className="text-6xl">📚</div>
+                )}
+              </div>
+              <h3 className="text-3xl font-bold text-center mb-2 text-[#E8E8E3]">
+                {passed ? "Congratulations!" : "Keep Learning!"}
+              </h3>
+              <p className="text-center text-[#9B9B95] mb-6">
+                {passed
+                  ? "You've demonstrated great understanding of the topic!"
+                  : "Review the explanations below and try again."}
+              </p>
+              <div className="flex justify-center gap-8 text-center">
+                <div>
+                  <div className="text-4xl font-bold text-[#AB7C5F]">{score.percentage}%</div>
+                  <div className="text-sm text-[#6B6B65] mt-1">Score</div>
+                </div>
+                <div>
+                  <div className="text-4xl font-bold text-[#E5E5E0]">
+                    {score.correct}/{score.total}
+                  </div>
+                  <div className="text-sm text-[#6B6B65] mt-1">Correct</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Question Review */}
+            <div className="space-y-4">
+              <h4 className="text-lg font-semibold text-[#E5E5E0] mb-4">Review Your Answers</h4>
+              {questions.map((q, index) => {
+                const userAnswer = selectedAnswers[index]
+                const isCorrect = userAnswer === q.correct
+
+                return (
+                  <div
+                    key={q.id}
+                    className={`p-4 rounded-lg border ${
+                      isCorrect ? "border-green-600 bg-green-900/10" : "border-red-600 bg-red-900/10"
+                    }`}
+                  >
+                    <div className="flex items-start gap-3 mb-3">
+                      <div
+                        className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
+                          isCorrect ? "bg-green-600" : "bg-red-600"
+                        }`}
+                      >
+                        {isCorrect ? <Check size={16} /> : <X size={16} />}
+                      </div>
+                      <div className="flex-1">
+                        <p className="font-medium text-[#E5E5E0] mb-2">
+                          {index + 1}. {q.question}
+                        </p>
+                        <div className="space-y-2 text-sm">
+                          <div>
+                            <span className="text-[#6B6B65]">Your answer: </span>
+                            <span className={isCorrect ? "text-green-400" : "text-red-400"}>
+                              {q.options[userAnswer]}
+                            </span>
+                          </div>
+                          {!isCorrect && (
+                            <div>
+                              <span className="text-[#6B6B65]">Correct answer: </span>
+                              <span className="text-green-400">{q.options[q.correct]}</span>
+                            </div>
+                          )}
+                          <div className="mt-2 p-3 bg-[#0D0D0D] rounded text-[#9B9B95] border border-[#2E2E2E]">
+                            <span className="font-medium text-[#AB7C5F]">Explanation: </span>
+                            {q.explanation}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            <button
+              onClick={onComplete}
+              className="w-full px-6 py-3 bg-[#AB7C5F] hover:bg-[#8B6B52] rounded-lg text-white font-medium transition-colors"
+            >
+              Return to Document
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Quiz view
+  return (
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-[#1E1E1E]">
+      {/* Header */}
+      <div className="flex items-center justify-between p-6 border-b border-[#2E2E2E] flex-shrink-0">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 text-xs text-[#6B6B65] mb-1">
+            <span>
+              Question {currentQuestion + 1} of {questions.length}
+            </span>
+            {topic && (
+              <>
+                <span>•</span>
+                <span>Topic: {topic}</span>
+              </>
+            )}
+          </div>
+          <h2 className="text-xl font-bold text-[#E5E5E0]">Quiz Time</h2>
+        </div>
+        <button
+          onClick={onComplete}
+          className="p-2 hover:bg-[#2E2E2E] rounded-lg transition-colors text-[#9B9B95]"
+          title="Exit quiz"
+        >
+          <XCircle size={20} />
+        </button>
+      </div>
+
+      {/* Progress Bar */}
+      <div className="h-2 bg-[#0D0D0D] flex-shrink-0">
+        <div 
+          className="h-full bg-gradient-to-r from-[#AB7C5F] to-[#8B6B52] transition-all duration-300"
+          style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }}
+        />
+      </div>
+
+      {/* Question Content */}
+      <div className="flex-1 overflow-y-auto p-6">
+        <div className="max-w-2xl mx-auto">
+          <div className="bg-[#0D0D0D] rounded-lg p-6 border border-[#2E2E2E] mb-6">
+            <h3 className="text-lg font-semibold text-[#E5E5E0] mb-6">{question.question}</h3>
+
+            <div className="space-y-3">
+              {question.options.map((option, index) => {
+                const isSelected = selectedAnswers[currentQuestion] === index
+                const isCorrect = index === question.correct
+                const showCorrect = hasAnswered && isCorrect
+                const showIncorrect = hasAnswered && isSelected && !isCorrect
+
+                return (
+                  <button
+                    key={index}
+                    onClick={() => !hasAnswered && handleSelectAnswer(index)}
+                    disabled={hasAnswered}
+                    className={`w-full text-left px-4 py-3 rounded-lg border-2 transition-all ${
+                      showCorrect
+                        ? "border-green-600 bg-green-900/20"
+                        : showIncorrect
+                        ? "border-red-600 bg-red-900/20"
+                        : isSelected
+                        ? "border-[#AB7C5F] bg-[#2E2E2E]"
+                        : "border-[#2E2E2E] bg-[#1E1E1E] hover:border-[#3E3E3E]"
+                    } ${hasAnswered ? 'cursor-default' : 'cursor-pointer'}`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${
+                        showCorrect
+                          ? "border-green-600 bg-green-600"
+                          : showIncorrect
+                          ? "border-red-600 bg-red-600"
+                          : isSelected
+                          ? "border-[#AB7C5F] bg-[#AB7C5F]"
+                          : "border-[#4E4E4E]"
+                      }`}>
+                        {showCorrect && <Check size={14} className="text-white" />}
+                        {showIncorrect && <X size={14} className="text-white" />}
+                        {isSelected && !hasAnswered && <div className="w-2 h-2 bg-white rounded-full" />}
+                      </div>
+                      <span className="text-[#E5E5E0] font-medium flex-1">{option}</span>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+
+            {hasAnswered && (
+              <div className="mt-6 p-4 rounded-lg bg-[#2E2E2E] border border-[#3E3E3E]">
+                <p className="text-sm text-[#9B9B95]">
+                  <span className="font-medium text-[#E5E5E0]">Explanation:</span>{" "}
+                  {question.explanation}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <div className="border-t border-[#2E2E2E] bg-[#171717] px-6 py-4 flex items-center justify-between flex-shrink-0">
+        <button
+          onClick={handlePrevious}
+          disabled={currentQuestion === 0}
+          className="px-4 py-2 rounded-lg bg-[#2E2E2E] text-[#E5E5E0] hover:bg-[#3E3E3E] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium"
+        >
+          Previous
+        </button>
+        <div className="text-sm text-[#6B6B65]">
+          {Object.keys(selectedAnswers).length} / {questions.length} answered
+        </div>
+        <button
+          onClick={handleNext}
+          disabled={!hasAnswered}
+          className="px-6 py-2 rounded-lg bg-[#AB7C5F] text-white hover:bg-[#8B6B52] disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm font-medium flex items-center gap-2"
+        >
+          {isLastQuestion ? "Submit Quiz" : "Next"}
+          <ChevronRight size={16} />
+        </button>
+      </div>
+    </div>
+  )
 }
 
 // Model Selector Component
@@ -391,7 +912,6 @@ function PDFViewer({ pdfUrl, currentPage, setCurrentPage, zoom, setZoom, rotatio
         setError(null)
         setLoading(true)
         
-        // Load PDF.js library if not already loaded
         if (!window.pdfjsLib) {
           await new Promise<void>((resolve, reject) => {
             const script = document.createElement('script')
@@ -471,7 +991,6 @@ function PDFViewer({ pdfUrl, currentPage, setCurrentPage, zoom, setZoom, rotatio
 
   return (
     <div className="flex flex-col h-full bg-[#0F0F0F]">
-      {/* Toolbar */}
       <div className="border-b border-[#2E2E2E] bg-[#171717] px-3 py-2 flex items-center justify-between flex-shrink-0">
         <div className="flex items-center gap-2">
           <button 
@@ -505,7 +1024,6 @@ function PDFViewer({ pdfUrl, currentPage, setCurrentPage, zoom, setZoom, rotatio
         </div>
       </div>
 
-      {/* PDF Display */}
       <div className="flex-1 overflow-auto bg-[#0F0F0F] p-4 flex items-start justify-center">
         {currentPageData && (
           <div
@@ -525,7 +1043,6 @@ function PDFViewer({ pdfUrl, currentPage, setCurrentPage, zoom, setZoom, rotatio
         )}
       </div>
 
-      {/* Navigation */}
       <div className="border-t border-[#2E2E2E] bg-[#171717] px-3 py-2 flex items-center justify-between flex-shrink-0">
         <button
           onClick={() => currentPage > 1 && setCurrentPage(currentPage - 1)}
@@ -566,6 +1083,10 @@ function PDFViewer({ pdfUrl, currentPage, setCurrentPage, zoom, setZoom, rotatio
 
 // Message Component
 function Message({ message, onRetry }: { message: Message; onRetry?: () => void }) {
+  useEffect(() => {
+    loadKaTeX()
+  }, [])
+
   if (message.isUser) {
     return (
       <div className="flex justify-end mb-4 animate-fadeIn">
@@ -588,7 +1109,8 @@ function Message({ message, onRetry }: { message: Message; onRetry?: () => void 
           <div className="flex-1 min-w-0">
             <div className="prose prose-invert max-w-none">
               <ReactMarkdown 
-                remarkPlugins={[remarkGfm]}
+                remarkPlugins={[remarkGfm, remarkMath]}
+                rehypePlugins={[rehypeKatex]}
                 components={MarkdownComponents}
               >
                 {message.content}
@@ -642,18 +1164,20 @@ export default function StudyPDFInterface() {
   const [splitPosition, setSplitPosition] = useState(50)
   const [isDragging, setIsDragging] = useState(false)
   const [lastQuery, setLastQuery] = useState<string | null>(null)
+  const [showQuizModal, setShowQuizModal] = useState(false)
+  const [quizMode, setQuizMode] = useState(false)
+  const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([])
+  const [generatingQuiz, setGeneratingQuiz] = useState(false)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const splitContainerRef = useRef<HTMLDivElement>(null)
 
-  // Auto-scroll messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
 
-  // Auto-resize textarea
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
@@ -661,7 +1185,6 @@ export default function StudyPDFInterface() {
     }
   }, [input])
 
-  // Handle split panel dragging
   const handleMouseDown = useCallback(() => {
     setIsDragging(true)
   }, [])
@@ -693,7 +1216,6 @@ export default function StudyPDFInterface() {
     }
   }, [isDragging, handleMouseMove, handleMouseUp])
 
-  // Chunk PDF content
   const chunkPDFContent = (pdfPages: Array<{ pageNumber: number; text: string; hasImage?: boolean }>) => {
     const chunks: PDFChunk[] = []
     const CHUNK_SIZE = 1000
@@ -731,7 +1253,6 @@ export default function StudyPDFInterface() {
     return chunks
   }
 
-  // Find relevant chunks
   const findRelevantChunks = (query: string, chunks: PDFChunk[], topK = 5) => {
     const queryWords = query.toLowerCase()
       .split(/\s+/)
@@ -763,7 +1284,6 @@ export default function StudyPDFInterface() {
       .slice(0, topK)
   }
 
-  // API call with retry and fallback
   const callAPI = async (userPrompt: string, images?: string[], retryCount = 0, triedModels: string[] = []): Promise<string> => {
     const currentModelToTry = retryCount === 0 ? selectedModel : MODELS.find(m => !triedModels.includes(m.id))?.id || selectedModel
     
@@ -836,7 +1356,6 @@ export default function StudyPDFInterface() {
     }
   }
 
-  // Handle file selection
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || file.type !== 'application/pdf') {
@@ -939,7 +1458,94 @@ export default function StudyPDFInterface() {
     }
   }
 
-  // Send message
+  const handleGenerateQuiz = async (config: any) => {
+    setShowQuizModal(false)
+    setGeneratingQuiz(true)
+    
+    try {
+      let prompt = ''
+      
+      if (config.type === 'document') {
+        const relevantPages = pdfFile!.pages.filter(
+          p => p.pageNumber >= config.startPage && p.pageNumber <= config.endPage
+        )
+        
+        const context = relevantPages.map(p => 
+          `[Page ${p.pageNumber}]\n${p.text}`
+        ).join('\n\n')
+        
+        prompt = `You are a quiz generator. Generate a ${config.difficulty} difficulty quiz with EXACTLY ${config.numQuestions} multiple-choice questions based on the following document content:
+
+${context}
+
+CRITICAL INSTRUCTIONS:
+1. Return ONLY valid JSON, no markdown formatting, no backticks
+2. Each question must have exactly 4 options
+3. The "correct" field must be the index (0-3) of the correct answer
+4. Include detailed explanations for each answer
+
+Return in this EXACT format:
+{
+  "questions": [
+    {
+      "id": 1,
+      "question": "Question text here?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correct": 0,
+      "explanation": "Detailed explanation here"
+    }
+  ]
+}
+
+Generate ${config.numQuestions} questions now:`
+      } else {
+        prompt = `You are a quiz generator. Generate a ${config.difficulty} difficulty quiz with EXACTLY ${config.numQuestions} multiple-choice questions about the topic: "${config.topic}"
+
+CRITICAL INSTRUCTIONS:
+1. Return ONLY valid JSON, no markdown formatting, no backticks
+2. Each question must have exactly 4 options
+3. The "correct" field must be the index (0-3) of the correct answer
+4. Include detailed explanations for each answer
+5. Make questions in-depth and comprehensive about ${config.topic}
+
+Return in this EXACT format:
+{
+  "questions": [
+    {
+      "id": 1,
+      "question": "Question text here?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correct": 0,
+      "explanation": "Detailed explanation here"
+    }
+  ]
+}
+
+Generate ${config.numQuestions} questions now:`
+      }
+      
+      const response = await callAPI(prompt)
+      
+      let cleanedResponse = response.trim()
+      cleanedResponse = cleanedResponse.replace(/```json\n?/g, '').replace(/```\n?/g, '')
+      cleanedResponse = cleanedResponse.replace(/^[^{]*({[\s\S]*})[^}]*$/, '$1')
+      
+      const quizData = JSON.parse(cleanedResponse)
+      
+      if (!quizData.questions || !Array.isArray(quizData.questions)) {
+        throw new Error('Invalid quiz format')
+      }
+      
+      setQuizQuestions(quizData.questions)
+      setQuizMode(true)
+      setGeneratingQuiz(false)
+    } catch (error) {
+      console.error('Quiz generation error:', error)
+      setGeneratingQuiz(false)
+      alert('Failed to generate quiz. Please try again.')
+    }
+  }
+
   const handleSendMessage = async () => {
     if (!input.trim() || !pdfFile || loading) return
 
@@ -1041,6 +1647,10 @@ Instructions:
 - **CRITICAL: When displaying code, ALWAYS wrap it in markdown code blocks with the language specified**
   Example: \`\`\`cpp\n// code here\n\`\`\`
   Example: \`\`\`python\n# code here\n\`\`\`
+- **CRITICAL: For mathematical expressions, use LaTeX notation:**
+  - Inline math: $expression$
+  - Display math: $expression$
+  Example: $E = mc^2$ or $\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$
 - Use proper markdown formatting with headers, bold, lists, code blocks
 - Be specific and reference page numbers when appropriate
 - If images are provided, analyze their visual content in detail
@@ -1184,12 +1794,47 @@ Provide your answer:`
     )
   }
 
+  if (generatingQuiz) {
+    return (
+      <div className="flex items-center justify-center h-screen bg-[#1A1A1A]">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-full bg-gradient-to-br from-[#AB7C5F] to-[#8B6B52] flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <HelpCircle size={32} className="text-white" />
+          </div>
+          <p className="text-[#E8E8E3] text-lg font-medium">Generating Quiz...</p>
+          <p className="text-[#6B6B65] text-sm mt-2">Creating questions based on your settings</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (quizMode) {
+    return (
+      <QuizMode 
+        questions={quizQuestions} 
+        onComplete={() => {
+          setQuizMode(false)
+          setQuizQuestions([])
+        }} 
+        topic={pdfFile.name}
+      />
+    )
+  }
+
   return (
     <div 
       ref={splitContainerRef}
       className="flex h-screen bg-[#1A1A1A] overflow-hidden select-none"
       style={{ cursor: isDragging ? 'col-resize' : 'default' }}
     >
+      {showQuizModal && (
+        <QuizGenerationModal
+          onClose={() => setShowQuizModal(false)}
+          onGenerate={handleGenerateQuiz}
+          totalPages={pdfFile.totalPages}
+        />
+      )}
+
       {/* Left Panel - Chat */}
       <div 
         className="flex flex-col bg-[#1A1A1A] overflow-hidden"
@@ -1230,6 +1875,14 @@ Provide your answer:`
 
         {/* Quick Actions */}
         <div className="border-b border-[#2E2E2E] bg-[#1A1A1A] px-4 py-2 flex gap-2 overflow-x-auto flex-shrink-0">
+          <button
+            onClick={() => setShowQuizModal(true)}
+            disabled={loading}
+            className="px-3 py-1.5 rounded-md bg-gradient-to-r from-[#AB7C5F] to-[#8B6B52] hover:from-[#8B6B52] hover:to-[#7B5B42] text-white text-xs whitespace-nowrap transition-all disabled:opacity-50 flex items-center gap-1.5 font-medium"
+          >
+            <HelpCircle size={14} />
+            Quiz Me
+          </button>
           <button
             onClick={() => {
               setInput("Summarize this entire document")
