@@ -36,7 +36,7 @@ export default function PDFViewer({ pdfUrl, onPageSelect, selectedPage }: PDFVie
         const loadedPages: { image: string; text: string }[] = []
 
         // Load first 20 pages for performance
-        for (let i = 1; i <= Math.min(pdf.numPages, 20); i++) {
+        for (let i = 1; i <= Math.min(pdf.numPages, 200); i++) {
           const page = await pdf.getPage(i)
           
           const textContent = await page.getTextContent()

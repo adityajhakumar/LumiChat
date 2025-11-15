@@ -1,5 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { FileUp, X, ArrowUp, Sparkles, BookOpen, Search, Loader2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Download, Camera, Code, Brain, Bot, MessageSquare, ChevronDown, FileText, AlertCircle } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { FileUp, X, ArrowUp, Sparkles, BookOpen, Search, Loader2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, Download, Camera, Code, Brain, Bot, MessageSquare, ChevronDown, FileText, AlertCircle, Check, Copy } from 'lucide-react'
 
 // Model configurations
 const MODELS = [
@@ -21,7 +23,127 @@ const getIcon = (category) => {
   return icons[category] || icons.General
 }
 
-// Model Selector Component
+// Code Block Component with Prism.js
+function CodeBlock({ code, language = 'javascript' }) {
+  const [copied, setCopied] = useState(false)
+  const codeRef = useRef(null)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && !window.__prismLoaded) {
+      const link = document.createElement('link')
+      link.rel = 'stylesheet'
+      link.href = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css'
+      document.head.appendChild(link)
+
+      const script = document.createElement('script')
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js'
+      script.onload = () => {
+        window.__prismLoaded = true
+        const langs = ['python', 'javascript', 'typescript', 'jsx', 'tsx', 'css', 'markup', 'json', 'bash', 'sql', 'java', 'cpp', 'c', 'csharp', 'go', 'rust', 'ruby', 'php']
+        langs.forEach(lang => {
+          const langScript = document.createElement('script')
+          langScript.src = `https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-${lang}.min.js`
+          document.head.appendChild(langScript)
+        })
+      }
+      document.head.appendChild(script)
+    }
+
+    const tryHighlight = () => {
+      if (window.Prism && codeRef.current) {
+        window.Prism.highlightElement(codeRef.current)
+      } else {
+        requestAnimationFrame(tryHighlight)
+      }
+    }
+    tryHighlight()
+  }, [code, language])
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(code)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  const langMap = {
+    js: 'javascript', ts: 'typescript', py: 'python', rb: 'ruby',
+    sh: 'bash', yml: 'yaml', md: 'markdown', html: 'markup', xml: 'markup'
+  }
+
+  const prismLang = langMap[language.toLowerCase()] || language.toLowerCase()
+
+  return (
+    <div className="relative bg-[#1A1A1A] rounded-lg overflow-hidden border border-[#3A3A3A] my-4">
+      <div className="flex justify-between items-center bg-[#252525] px-4 py-2 border-b border-[#3A3A3A]">
+        <span className="text-xs uppercase text-[#A0A0A0] font-semibold tracking-wider">{language}</span>
+        <button
+          onClick={handleCopy}
+          className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md bg-[#2A2A2A] hover:bg-[#353535] text-[#A0A0A0] hover:text-[#ECECEC] transition-colors font-medium"
+        >
+          {copied ? <><Check size={14}/>Copied!</> : <><Copy size={14}/>Copy</>}
+        </button>
+      </div>
+      <div className="overflow-x-auto">
+        <pre className="!m-0 !p-4 !bg-[#1A1A1A]" style={{ fontSize: '0.875rem', lineHeight: '1.6' }}>
+          <code
+            ref={codeRef}
+            className={`language-${prismLang}`}
+            style={{ fontFamily: '"Fira Code", "Cascadia Code", "SF Mono", Menlo, Consolas, monospace' }}
+          >
+            {code}
+          </code>
+        </pre>
+      </div>
+    </div>
+  )
+}
+
+// Markdown components for proper formatting
+const getMarkdownComponents = () => ({
+  table: ({ node, ...props }) => (
+    <div className="overflow-x-auto my-6">
+      <table className="min-w-full border-collapse border border-[#3A3A3A] rounded-lg" {...props} />
+    </div>
+  ),
+  thead: ({ node, ...props }) => <thead className="bg-[#2A2A2A]" {...props} />,
+  th: ({ node, ...props }) => (
+    <th className="border border-[#3A3A3A] px-4 py-2 text-left font-semibold text-[#ECECEC]" {...props} />
+  ),
+  td: ({ node, ...props }) => (
+    <td className="border border-[#3A3A3A] px-4 py-2 text-[#D4D4D4]" {...props} />
+  ),
+  tr: ({ node, ...props }) => <tr className="hover:bg-[#252525] transition-colors" {...props} />,
+  p: ({ node, ...props }) => <p className="my-4 leading-7 text-[#ECECEC]" {...props} />,
+  h1: ({ node, ...props }) => <h1 className="text-2xl font-semibold my-6 text-[#ECECEC]" {...props} />,
+  h2: ({ node, ...props }) => <h2 className="text-xl font-semibold my-5 text-[#ECECEC]" {...props} />,
+  h3: ({ node, ...props }) => <h3 className="text-lg font-semibold my-4 text-[#ECECEC]" {...props} />,
+  ul: ({ node, ...props }) => <ul className="my-4 ml-6 list-disc space-y-2 text-[#ECECEC]" {...props} />,
+  ol: ({ node, ...props }) => <ol className="my-4 ml-6 list-decimal space-y-2 text-[#ECECEC]" {...props} />,
+  li: ({ node, ...props }) => <li className="my-1 leading-7" {...props} />,
+  blockquote: ({ node, ...props }) => (
+    <blockquote className="border-l-4 border-[#CC785C] pl-4 my-4 italic text-[#D4D4D4]" {...props} />
+  ),
+  code: ({ node, inline, className, children, ...props }) => {
+    const isCodeBlock = !inline && className
+    const language = className?.replace('language-', '') || 'javascript'
+    const code = String(children).replace(/\n$/, '')
+
+    return isCodeBlock ? (
+      <CodeBlock code={code} language={language} />
+    ) : (
+      <code
+        className="bg-[#2A2A2A] text-[#E69B8A] px-1.5 py-0.5 rounded text-[14px] font-mono break-words"
+        style={{ fontFamily: '"SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace' }}
+        {...props}
+      >
+        {children}
+      </code>
+    )
+  }
+})
+
+// Message Bubble Component
+function MessageBubble({ message, isUser }) {
 function ModelSelector({ selectedModel, onModelChange }) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef(null)
@@ -107,7 +229,7 @@ function ModelSelector({ selectedModel, onModelChange }) {
 // PDF Viewer Component
 function PDFViewer({ pdfUrl, currentPage, setCurrentPage, onPageClick }) {
   const [totalPages, setTotalPages] = useState(0)
-  const [zoom, setZoom] = useState(1000)
+  const [zoom, setZoom] = useState(100)
   const [pages, setPages] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -130,7 +252,7 @@ function PDFViewer({ pdfUrl, currentPage, setCurrentPage, onPageClick }) {
         setTotalPages(pdf.numPages)
 
         const loadedPages = []
-        const maxPages = Math.min(pdf.numPages, 100)
+        const maxPages = Math.min(pdf.numPages, 30)
 
         for (let i = 1; i <= maxPages; i++) {
           const page = await pdf.getPage(i)
@@ -319,7 +441,7 @@ function MessageBubble({ message, isUser }) {
 }
 
 // Main Component
-export default function StudyPDFInterface({ 
+function StudyPDFInterface({ 
   selectedModel: externalModel, 
   onModelChange: externalOnModelChange,
   onTokenCountChange,
@@ -477,7 +599,17 @@ export default function StudyPDFInterface({
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error?.message || `API Error: ${response.status} ${response.statusText}`)
+        
+        // Handle specific error cases
+        if (response.status === 403 || errorData.error?.code === 403) {
+          throw new Error('This model flagged your input. Try a different model like Gemini 2.0 or Qwen VL.')
+        }
+        
+        if (response.status === 429) {
+          throw new Error('Rate limit exceeded. Please wait a moment and try again.')
+        }
+        
+        throw new Error(errorData.error?.message || `Request failed (${response.status})`)
       }
 
       const data = await response.json()
@@ -822,23 +954,20 @@ Be thorough but concise. Use examples where helpful.`
       </div>
 
       {/* Chat Section */}
-      <div className="w-1/2 flex flex-col overflow-hidden">
-        {/* Header */}
-        <div className="border-b border-[#2E2E2E] bg-[#171717] px-4 py-3 flex items-center justify-between flex-shrink-0">
+      <div className="w-1/2 flex flex-col overflow-hidden bg-white">
+        {/* Header - Minimal and Clean */}
+        <div className="border-b border-gray-200 bg-white px-6 py-4 flex items-center justify-between flex-shrink-0">
           <div className="flex-1 min-w-0 mr-4">
-            <p className="text-sm font-semibold text-[#E5E5E0] truncate flex items-center gap-2">
-              <FileText size={16} className="text-[#CC785C]" />
-              {pdfFile.name}
-            </p>
-            <p className="text-xs text-[#6B6B65] mt-1">
-              {pdfFile.totalPages} pages • {pdfChunks.length} chunks • {pdfFile.size}
+            <h2 className="text-base font-semibold text-gray-900 truncate">{pdfFile.name}</h2>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {pdfFile.totalPages} pages • {pdfFile.size}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <ModelSelector selectedModel={selectedModel} onModelChange={handleModelChange} />
             <button
               onClick={handleReset}
-              className="p-2 hover:bg-[#2A2A2A] rounded transition-colors text-[#9B9B95] hover:text-red-400"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors text-gray-500 hover:text-gray-700"
               title="Close PDF"
             >
               <X size={20} />
@@ -846,55 +975,48 @@ Be thorough but concise. Use examples where helpful.`
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="border-b border-[#2E2E2E] bg-[#1A1A1A] px-4 py-3 flex gap-2 flex-shrink-0 overflow-x-auto">
-          <button
-            onClick={handleSummarizePDF}
-            disabled={loading}
-            className="px-4 py-2 rounded-lg bg-[#2A2A2A] hover:bg-[#3A3A3A] text-[#E5E5E0] text-sm whitespace-nowrap transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 border border-[#3A3A3A] hover:border-[#CC785C]/50"
-          >
-            <Sparkles size={16} className="text-[#CC785C]" />
-            Summarize Document
-          </button>
-          <button
-            onClick={handlePageContext}
-            disabled={loading}
-            className="px-4 py-2 rounded-lg bg-[#2A2A2A] hover:bg-[#3A3A3A] text-[#E5E5E0] text-sm whitespace-nowrap transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 border border-[#3A3A3A] hover:border-[#CC785C]/50"
-          >
-            <BookOpen size={16} className="text-[#CC785C]" />
-            Explain Page {currentPage}
-          </button>
-        </div>
-
-        {/* Messages Area */}
-        <div className="flex-1 overflow-y-auto px-4 py-4 bg-[#1A1A1A]">
+        {/* Messages Area - Clean with more spacing */}
+        <div className="flex-1 overflow-y-auto px-6 py-6 bg-gray-50">
           {messages.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-center">
-              <div className="max-w-md">
-                <div className="w-16 h-16 rounded-full bg-[#2A2A2A] flex items-center justify-center mx-auto mb-4">
-                  <Search className="w-8 h-8 text-[#CC785C]" />
+            <div className="flex items-center justify-center h-full">
+              <div className="max-w-md text-center">
+                <div className="w-16 h-16 rounded-full bg-[#CC785C]/10 flex items-center justify-center mx-auto mb-4">
+                  <MessageSquare className="w-8 h-8 text-[#CC785C]" />
                 </div>
-                <h3 className="text-lg font-semibold text-[#E5E5E0] mb-2">Ask anything about your PDF</h3>
-                <p className="text-sm text-[#9B9B95] mb-4">Get AI-powered answers with accurate page citations</p>
+                <h3 className="text-lg font-semibold text-gray-900 mb-2">Ask me anything</h3>
+                <p className="text-sm text-gray-600 mb-6">I'll answer based on the document content with page references</p>
                 
-                <div className="grid gap-2 text-left">
+                <div className="grid gap-3">
                   <button 
-                    onClick={() => setInput("What is the main topic of this document?")}
-                    className="p-3 bg-[#2A2A2A] hover:bg-[#3A3A3A] rounded-lg text-sm text-[#E5E5E0] transition-colors text-left border border-[#3A3A3A]"
+                    onClick={handleSummarizePDF}
+                    disabled={loading}
+                    className="p-4 bg-white hover:bg-gray-50 rounded-xl text-left border border-gray-200 transition-all hover:border-[#CC785C] hover:shadow-sm disabled:opacity-50"
                   >
-                    💡 What is the main topic of this document?
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-[#CC785C]/10 flex items-center justify-center flex-shrink-0">
+                        <Sparkles className="w-5 h-5 text-[#CC785C]" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Summarize document</p>
+                        <p className="text-xs text-gray-500">Get a comprehensive overview</p>
+                      </div>
+                    </div>
                   </button>
+                  
                   <button 
-                    onClick={() => setInput("Can you explain the key concepts?")}
-                    className="p-3 bg-[#2A2A2A] hover:bg-[#3A3A3A] rounded-lg text-sm text-[#E5E5E0] transition-colors text-left border border-[#3A3A3A]"
+                    onClick={handlePageContext}
+                    disabled={loading}
+                    className="p-4 bg-white hover:bg-gray-50 rounded-xl text-left border border-gray-200 transition-all hover:border-[#CC785C] hover:shadow-sm disabled:opacity-50"
                   >
-                    📚 Can you explain the key concepts?
-                  </button>
-                  <button 
-                    onClick={() => setInput("What are the most important takeaways?")}
-                    className="p-3 bg-[#2A2A2A] hover:bg-[#3A3A3A] rounded-lg text-sm text-[#E5E5E0] transition-colors text-left border border-[#3A3A3A]"
-                  >
-                    ⭐ What are the most important takeaways?
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-lg bg-[#CC785C]/10 flex items-center justify-center flex-shrink-0">
+                        <BookOpen className="w-5 h-5 text-[#CC785C]" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">Explain page {currentPage}</p>
+                        <p className="text-xs text-gray-500">Understand the current page</p>
+                      </div>
+                    </div>
                   </button>
                 </div>
               </div>
@@ -906,10 +1028,10 @@ Be thorough but concise. Use examples where helpful.`
               ))}
               {loading && (
                 <div className="flex justify-start mb-4 animate-fadeIn">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-[#CC785C] to-[#B8674A] flex items-center justify-center mr-2 shadow-lg">
+                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-[#CC785C] to-[#B8674A] flex items-center justify-center mr-3 shadow-sm">
                     <FileText size={16} className="text-white" />
                   </div>
-                  <div className="bg-[#2A2A2A] border border-[#3A3A3A] rounded-xl px-4 py-3">
+                  <div className="bg-white rounded-2xl px-4 py-3 border border-gray-200 shadow-sm">
                     <div className="flex space-x-2">
                       <div className="w-2 h-2 bg-[#CC785C] rounded-full animate-bounce"></div>
                       <div className="w-2 h-2 bg-[#CC785C] rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
@@ -923,22 +1045,22 @@ Be thorough but concise. Use examples where helpful.`
           )}
         </div>
 
-        {/* Input Area */}
-        <div className="border-t border-[#2E2E2E] bg-[#171717] px-4 py-4 flex-shrink-0">
-          <div className="flex gap-3">
+        {/* Input Area - Clean and minimal */}
+        <div className="border-t border-gray-200 bg-white px-6 py-4 flex-shrink-0">
+          <div className="flex gap-3 items-end">
             <textarea
               ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Ask anything about this document..."
-              className="resize-none bg-[#2A2A2A] border border-[#3A3A3A] text-white placeholder-[#6B6B6B] focus:border-[#CC785C] focus:outline-none rounded-xl text-sm flex-1 px-4 py-3 max-h-[120px] transition-colors"
+              className="resize-none bg-gray-50 border border-gray-200 text-gray-900 placeholder-gray-400 focus:border-[#CC785C] focus:outline-none focus:ring-2 focus:ring-[#CC785C]/20 rounded-xl text-sm flex-1 px-4 py-3 max-h-[120px] transition-all"
               rows={1}
             />
             <button
               onClick={handleSendMessage}
               disabled={loading || !input.trim()}
-              className="px-5 py-3 rounded-xl bg-gradient-to-r from-[#CC785C] to-[#B8674A] hover:from-[#B8674A] hover:to-[#A85638] text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center self-end shadow-lg hover:shadow-[#CC785C]/30 disabled:hover:shadow-none transform hover:scale-105 disabled:hover:scale-100"
+              className="px-5 py-3 rounded-xl bg-[#CC785C] hover:bg-[#B8674A] text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center shadow-sm hover:shadow-md disabled:hover:shadow-sm transform hover:scale-105 disabled:hover:scale-100"
             >
               {loading ? (
                 <Loader2 className="animate-spin" size={20} />
@@ -947,11 +1069,8 @@ Be thorough but concise. Use examples where helpful.`
               )}
             </button>
           </div>
-          <p className="text-xs text-[#6B6B65] mt-2 flex items-center gap-2">
-            <span>Press Enter to send • Shift+Enter for new line</span>
-            {messages.length > 0 && (
-              <span className="ml-auto text-[#CC785C]">{messages.length} messages</span>
-            )}
+          <p className="text-xs text-gray-500 mt-2">
+            Press Enter to send, Shift+Enter for new line
           </p>
         </div>
       </div>
@@ -974,3 +1093,5 @@ Be thorough but concise. Use examples where helpful.`
     </div>
   )
 }
+
+export default StudyPDFInterface
