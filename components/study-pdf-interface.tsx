@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { FileUp, X, Send, Sparkles, BookOpen, Loader2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, Maximize2, GripVertical, FileText, AlertCircle, MessageSquare, Bot } from 'lucide-react'
+import { FileUp, X, Send, Sparkles, BookOpen, Loader2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, Maximize2, GripVertical, FileText, AlertCircle, MessageSquare, Bot, Camera } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -42,13 +42,16 @@ interface Message {
   content: string;
   isUser: boolean;
   citations?: number[];
+  hasImages?: boolean;
 }
 
 interface PDFFile {
   name: string;
   url: string;
   totalPages: number;
-  pages: Array<{ pageNumber: number; text: string }>;
+  pages: Array<{ pageNumber: number; text: string; hasImage?: boolean }>;
+  images?: string[];
+  isImageHeavy?: boolean;
 }
 
 interface PDFChunk {
@@ -66,6 +69,8 @@ function ModelSelector({ selectedModel, onModelChange, disabled }: { selectedMod
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsOpen(false)
+      } else if (errorMessage.includes('No content in API response')) {
+        displayMessage = `**⚠️ API Response Error**\n\nThe API returned a response but in an unexpected format.\n\n**This might mean:**\n- The API endpoint needs to be updated for vision support\n- The model doesn't support images\n- Check browser console for the actual response\n\n**Try:**\n1. Using a different model\n2. Asking about text-only pages\n3. Checking if images are too large`
       }
     }
     document.addEventListener("mousedown", handleClickOutside)
@@ -348,6 +353,12 @@ function Message({ message, onRetry }: { message: Message; onRetry?: () => void 
                     {cite}
                   </span>
                 ))}
+                {message.hasImages && (
+                  <span className="text-xs px-2 py-0.5 bg-blue-500/20 rounded text-blue-400 border border-blue-500/30 flex items-center gap-1">
+                    <Camera size={10} />
+                    Visual analysis
+                  </span>
+                )}
               </div>
             )}
             {isError && onRetry && (
@@ -433,7 +444,7 @@ export default function StudyPDFInterface() {
   }, [isDragging, handleMouseMove, handleMouseUp])
 
   // Chunk PDF content
-  const chunkPDFContent = (pdfPages: Array<{ pageNumber: number; text: string }>) => {
+  const chunkPDFContent = (pdfPages: Array<{ pageNumber: number; text: string; hasImage?: boolean }>) => {
     const chunks: PDFChunk[] = []
     const CHUNK_SIZE = 1000
     const OVERLAP = 200
@@ -441,6 +452,15 @@ export default function StudyPDFInterface() {
     pdfPages.forEach((pageData, pageIndex) => {
       const pageNum = pageIndex + 1
       const text = pageData.text
+      
+      // For image-based pages, create a single chunk with the marker
+      if (pageData.hasImage || text.includes('[Page') && text.includes('Image-based content]')) {
+        chunks.push({
+          text: `Page ${pageNum} contains visual/image content that requires visual analysis.`,
+          pageNumber: pageNum,
+        })
+        return
+      }
       
       if (!text || text.trim().length < 50) return
 
@@ -494,16 +514,46 @@ export default function StudyPDFInterface() {
       .slice(0, topK)
   }
 
-  // API call with retry and fallback
-  const callAPI = async (userPrompt: string, retryCount = 0, triedModels: string[] = []): Promise<string> => {
+  // API call with retry and fallback - now supports images
+  const callAPI = async (userPrompt: string, images?: string[], retryCount = 0, triedModels: string[] = []): Promise<string> => {
     const currentModelToTry = retryCount === 0 ? selectedModel : MODELS.find(m => !triedModels.includes(m.id))?.id || selectedModel
     
     try {
+      // Prepare messages with images if available
+      let messageContent: any = userPrompt
+      
+      if (images && images.length > 0) {
+        // For vision requests, send images inline
+        const contentArray = [
+          { 
+            type: "text", 
+            text: userPrompt 
+          }
+        ]
+        
+        // Add up to 4 images (API limit for most models)
+        images.slice(0, 4).forEach(imageData => {
+          contentArray.push({
+            type: "image_url",
+            image_url: {
+              url: imageData
+            }
+          })
+        })
+        
+        messageContent = contentArray
+      }
+
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [{ role: 'user', content: userPrompt }],
+          messages: [
+            {
+              role: "user",
+              content: messageContent
+            }
+          ],
           model: currentModelToTry,
           stream: false,
         }),
@@ -530,7 +580,7 @@ export default function StudyPDFInterface() {
               setSelectedModel(nextModel.id)
               
               // Recursive retry with next model
-              return await callAPI(userPrompt, retryCount + 1, updatedTriedModels)
+              return await callAPI(userPrompt, images, retryCount + 1, updatedTriedModels)
             }
           }
           
@@ -548,8 +598,29 @@ export default function StudyPDFInterface() {
 
       const data = await response.json()
       
-      if (!data.content) {
-        throw new Error('No response received')
+      console.log('API Response:', data) // Debug log
+      
+      // Handle different response formats
+      let content = data.content
+      
+      // OpenRouter sometimes returns choices array
+      if (!content && data.choices && data.choices.length > 0) {
+        content = data.choices[0].message?.content
+      }
+      
+      // Some models return text directly
+      if (!content && data.text) {
+        content = data.text
+      }
+      
+      // Last resort - check for message.content
+      if (!content && data.message?.content) {
+        content = data.message.content
+      }
+      
+      if (!content) {
+        console.error('Unexpected API response format:', data)
+        throw new Error('No content in API response. Response format may have changed.')
       }
       
       // Show success message if we had to switch models
@@ -558,14 +629,15 @@ export default function StudyPDFInterface() {
         console.log(`Successfully switched to ${modelName}`)
       }
       
-      return data.content
+      return content
     } catch (error) {
-      console.error('API call failed:', error)
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error'
+      console.error('API call failed:', errorMsg, error)
       throw error
     }
   }
 
-  // Handle file selection
+  // Handle file selection with advanced PDF processing
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || file.type !== 'application/pdf') {
@@ -588,10 +660,14 @@ export default function StudyPDFInterface() {
         'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
       
       const pdf = await pdfjsLib.getDocument({ data: buffer }).promise
-      const pdfPages: Array<{ pageNumber: number; text: string }> = []
+      const pdfPages: Array<{ pageNumber: number; text: string; hasImage: boolean }> = []
+      const pdfImages: string[] = []
       
+      // Extract both text and images from each page
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i)
+        
+        // Extract text
         const textContent = await page.getTextContent()
         const text = textContent.items
           .map((item: any) => item.str || '')
@@ -599,19 +675,61 @@ export default function StudyPDFInterface() {
           .trim()
           .replace(/\s+/g, ' ')
         
-        pdfPages.push({ pageNumber: i, text })
+        // Check if page has meaningful text (more than just a few characters)
+        const hasText = text.replace(/\s/g, '').length > 50
+        
+        // Extract image if text is insufficient
+        let hasImage = false
+        if (!hasText || text.length < 100) {
+          try {
+            const canvas = document.createElement('canvas')
+            const context = canvas.getContext('2d')
+            const viewport = page.getViewport({ scale: 1.5 })
+            
+            if (context) {
+              canvas.height = viewport.height
+              canvas.width = viewport.width
+              await page.render({ canvasContext: context, viewport }).promise
+              const imageData = canvas.toDataURL('image/jpeg', 0.85)
+              pdfImages.push(imageData)
+              hasImage = true
+            }
+          } catch (imgErr) {
+            console.warn(`Failed to extract image from page ${i}:`, imgErr)
+          }
+        }
+        
+        pdfPages.push({ 
+          pageNumber: i, 
+          text: text || `[Page ${i} - Image-based content]`,
+          hasImage 
+        })
       }
       
       const chunks = chunkPDFContent(pdfPages)
+      
+      // Determine if this is an image-heavy PDF
+      const imagePages = pdfPages.filter(p => p.hasImage).length
+      const isImageHeavy = imagePages > pdf.numPages * 0.3 // More than 30% are images
       
       setPdfFile({ 
         name: file.name, 
         url, 
         totalPages: pdf.numPages, 
         pages: pdfPages,
+        images: pdfImages,
+        isImageHeavy
       })
       setPdfChunks(chunks)
-      setMessages([])
+      setMessages([
+        {
+          role: 'assistant',
+          content: isImageHeavy 
+            ? `📄 **PDF Loaded: ${file.name}**\n\n✅ **${pdf.numPages} pages processed**\n⚠️ **Note:** This PDF contains ${imagePages} image-based pages. I've extracted images for better analysis.\n\n**What would you like to know about this document?**`
+            : `📄 **PDF Loaded: ${file.name}**\n\n✅ **${pdf.numPages} pages with ${chunks.length} text chunks**\n\n**What would you like to know about this document?**`,
+          isUser: false
+        }
+      ])
       setInput('')
       setCurrentPage(1)
       setProcessingPDF(false)
@@ -635,6 +753,15 @@ export default function StudyPDFInterface() {
     setMessages(prev => [...prev, userMessage])
     setInput('')
     setLoading(true)
+
+    // Show helpful message if processing image-heavy PDF
+    if (pdfFile.isImageHeavy) {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: '🔍 Analyzing document with visual content...',
+        isUser: false
+      }])
+    }
 
     try {
       // Check if question is about specific page
@@ -670,7 +797,24 @@ export default function StudyPDFInterface() {
 
       const citations = [...new Set(relevantChunks.map(c => c.pageNumber))].sort((a, b) => a - b)
 
-      const prompt = `You are a helpful PDF study assistant analyzing "${pdfFile.name}".
+      // Check if we need to include images for better context
+      const imagePagesToSend: string[] = []
+      if (pdfFile.images && pdfFile.images.length > 0 && pdfFile.isImageHeavy) {
+        citations.forEach(pageNum => {
+          const page = pdfFile.pages.find(p => p.pageNumber === pageNum)
+          if (page?.hasImage && pdfFile.images) {
+            // Get the image for this page (images are stored in order)
+            const imageIndex = pdfFile.pages
+              .filter(p => p.hasImage)
+              .findIndex(p => p.pageNumber === pageNum)
+            if (imageIndex >= 0 && imageIndex < pdfFile.images.length) {
+              imagePagesToSend.push(pdfFile.images[imageIndex])
+            }
+          }
+        })
+      }
+
+      let prompt = `You are a helpful PDF study assistant analyzing "${pdfFile.name}".
 
 Here is the relevant content from the document:
 
@@ -679,24 +823,39 @@ ${context}
 User Question: ${userQuestion}
 
 Instructions:
-- Answer based ONLY on the provided context above
+- Answer based on BOTH the text context above AND the images provided (if any)
 - Use markdown formatting for clarity
 - Be specific and reference page numbers when appropriate
-- If the context contains the answer, provide a detailed response
+- If images are provided, analyze their visual content in detail
+- Describe what you see in the images and how it relates to the question
 - If you need to see different pages, ask the user to specify
 
 Provide your answer:`
 
-      const content = await callAPI(prompt)
+      // Call API with images if available
+      const content = await callAPI(prompt, imagePagesToSend.length > 0 ? imagePagesToSend : undefined)
 
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content,
-        isUser: false,
-        citations: citations.length > 0 ? citations : undefined
-      }])
+      // Remove temporary "analyzing" message if it exists
+      setMessages(prev => {
+        const filtered = prev.filter(m => !m.content.includes('🔍 Analyzing document'))
+        return [...filtered, {
+          role: 'assistant',
+          content,
+          isUser: false,
+          citations: citations.length > 0 ? citations : undefined,
+          hasImages: imagePagesToSend.length > 0
+        }]
+      })
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An error occurred'
+      
+      console.error('Message send error:', {
+        error: errorMessage,
+        hadImages: imagePagesToSend.length > 0,
+        imageCount: imagePagesToSend.length,
+        model: selectedModel,
+        promptLength: prompt.length
+      })
       
       // Check if it's a rate limit error and suggest alternative
       let displayMessage = `**⚠️ Error**\n\n${errorMessage}`
@@ -794,7 +953,14 @@ Provide your answer:`
             <FileText size={18} className="text-[#CC785C]" />
             <div className="flex flex-col">
               <span className="text-sm font-semibold text-[#E5E5E0] truncate max-w-[200px]">{pdfFile.name}</span>
-              <span className="text-xs text-[#6B6B65]">{pdfFile.totalPages} pages • {pdfChunks.length} chunks</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-[#6B6B65]">{pdfFile.totalPages} pages • {pdfChunks.length} chunks</span>
+                {pdfFile.isImageHeavy && (
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                    IMAGE-HEAVY
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
