@@ -20,21 +20,26 @@ const MODELS = [
 
 // Markdown Components
 const MarkdownComponents = {
-  h1: ({...props}: any) => <h1 className="text-2xl font-bold mt-6 mb-4 text-[#E5E5E0]" {...props} />,
-  h2: ({...props}: any) => <h2 className="text-xl font-bold mt-5 mb-3 text-[#E5E5E0]" {...props} />,
-  h3: ({...props}: any) => <h3 className="text-lg font-semibold mt-4 mb-2 text-[#E5E5E0]" {...props} />,
-  p: ({...props}: any) => <p className="mb-3 leading-relaxed text-[#D4D4CF]" {...props} />,
-  ul: ({...props}: any) => <ul className="list-disc list-inside mb-3 space-y-1 text-[#D4D4CF]" {...props} />,
-  ol: ({...props}: any) => <ol className="list-decimal list-inside mb-3 space-y-1 text-[#D4D4CF]" {...props} />,
-  li: ({...props}: any) => <li className="ml-4" {...props} />,
+  h1: ({...props}: any) => <h1 className="text-2xl font-bold mt-6 mb-4 text-[#E5E5E0] leading-tight" {...props} />,
+  h2: ({...props}: any) => <h2 className="text-xl font-bold mt-5 mb-3 text-[#E5E5E0] leading-tight" {...props} />,
+  h3: ({...props}: any) => <h3 className="text-lg font-semibold mt-4 mb-2 text-[#E5E5E0] leading-snug" {...props} />,
+  p: ({...props}: any) => <p className="mb-4 leading-[1.7] text-[#D4D4CF] text-[15px]" {...props} />,
+  ul: ({...props}: any) => <ul className="list-disc list-outside mb-4 space-y-2 text-[#D4D4CF] pl-6" {...props} />,
+  ol: ({...props}: any) => <ol className="list-decimal list-outside mb-4 space-y-2 text-[#D4D4CF] pl-6" {...props} />,
+  li: ({...props}: any) => <li className="leading-[1.7] text-[15px]" {...props} />,
   code: ({inline, ...props}: any) => 
     inline 
-      ? <code className="bg-[#2A2A2A] px-1.5 py-0.5 rounded text-[#E5E5E0] text-sm font-mono" {...props} />
-      : <code className="block bg-[#1A1A1A] p-4 rounded-lg text-[#E5E5E0] text-sm font-mono overflow-x-auto mb-3" {...props} />,
-  blockquote: ({...props}: any) => <blockquote className="border-l-4 border-[#CC785C] pl-4 italic my-3 text-[#9B9B95]" {...props} />,
+      ? <code className="bg-[#2A2A2A] px-2 py-0.5 rounded text-[#E5E5E0] text-[14px] font-mono" {...props} />
+      : <code className="block bg-[#1A1A1A] p-4 rounded-lg text-[#E5E5E0] text-[14px] font-mono overflow-x-auto mb-4 leading-[1.6]" {...props} />,
+  pre: ({...props}: any) => <pre className="mb-4 overflow-x-auto" {...props} />,
+  blockquote: ({...props}: any) => <blockquote className="border-l-4 border-[#CC785C] pl-4 italic my-4 text-[#9B9B95] leading-[1.7]" {...props} />,
   strong: ({...props}: any) => <strong className="font-semibold text-[#E5E5E0]" {...props} />,
   em: ({...props}: any) => <em className="italic text-[#D4D4CF]" {...props} />,
-  a: ({...props}: any) => <a className="text-[#CC785C] hover:underline" {...props} />,
+  a: ({...props}: any) => <a className="text-[#CC785C] hover:underline underline-offset-2" {...props} />,
+  hr: ({...props}: any) => <hr className="border-[#2E2E2E] my-6" {...props} />,
+  table: ({...props}: any) => <div className="overflow-x-auto mb-4"><table className="min-w-full border-collapse" {...props} /></div>,
+  th: ({...props}: any) => <th className="border border-[#3A3A3A] px-3 py-2 bg-[#2A2A2A] text-left text-[#E5E5E0] font-semibold" {...props} />,
+  td: ({...props}: any) => <td className="border border-[#3A3A3A] px-3 py-2 text-[#D4D4CF]" {...props} />,
 }
 
 interface Message {
@@ -333,8 +338,8 @@ function Message({ message, onRetry }: { message: Message; onRetry?: () => void 
           <div className={`w-7 h-7 rounded-full ${isError ? 'bg-red-500/20 border-2 border-red-500/50' : 'bg-gradient-to-br from-[#CC785C] to-[#B8674A]'} flex items-center justify-center flex-shrink-0 mt-1`}>
             {isError ? <AlertCircle size={16} className="text-red-400" /> : <Bot size={16} className="text-white" />}
           </div>
-          <div className="flex-1">
-            <div className="prose prose-invert max-w-none">
+          <div className="flex-1 min-w-0">
+            <div className="prose prose-invert max-w-none text-justify">
               <ReactMarkdown 
                 remarkPlugins={[remarkGfm]}
                 components={MarkdownComponents}
