@@ -5,11 +5,17 @@ import { FileUp, X, Send, Sparkles, BookOpen, Loader2, ChevronLeft, ChevronRight
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
-// Model configurations
+// Model configurations - All multimodal models for better fallback
 const MODELS = [
   { id: "google/gemini-2.0-flash-exp:free", name: "Gemini 2.0 Flash", provider: "Google" },
+  { id: "google/gemma-3n-e2b-it:free", name: "Gemma 3n E2B", provider: "Google" },
+  { id: "google/gemma-3-4b-it:free", name: "Gemma 3 4B", provider: "Google" },
+  { id: "google/gemma-3-12b-it:free", name: "Gemma 3 12B", provider: "Google" },
+  { id: "google/gemma-3-27b-it:free", name: "Gemma 3 27B", provider: "Google" },
   { id: "qwen/qwen2.5-vl-32b-instruct:free", name: "Qwen2.5 VL 32B", provider: "Alibaba" },
-  { id: "meta-llama/llama-3.3-70b-instruct:free", name: "Llama 3.3 70B", provider: "Meta" },
+  { id: "nvidia/nemotron-nano-12b-v2-vl:free", name: "Nemotron Nano VL", provider: "NVIDIA" },
+  { id: "meta-llama/llama-4-maverick:free", name: "Llama 4 Maverick", provider: "Meta" },
+  { id: "meta-llama/llama-4-scout:free", name: "Llama 4 Scout", provider: "Meta" },
 ]
 
 // Markdown Components
@@ -76,7 +82,7 @@ function ModelSelector({ selectedModel, onModelChange, disabled }: { selectedMod
         className="px-3 py-2 rounded-lg bg-[#2A2A2A] hover:bg-[#3A3A3A] border border-[#3A3A3A] 
                    transition-colors flex items-center gap-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
       >
-        <span className="text-[#E5E5E0] text-xs font-medium truncate max-w-[120px]">
+        <span className="text-[#E5E5E0] text-xs font-medium truncate max-w-[140px]">
           {currentModel?.name || "Select Model"}
         </span>
         <ChevronRight size={14} className={`text-[#9B9B95] transition-transform ${isOpen ? 'rotate-90' : ''}`} />
@@ -84,7 +90,10 @@ function ModelSelector({ selectedModel, onModelChange, disabled }: { selectedMod
 
       {isOpen && (
         <div className="absolute top-full left-0 mt-2 bg-[#2A2A2A] border border-[#3A3A3A] rounded-lg shadow-2xl z-50 
-                        min-w-[220px] overflow-hidden">
+                        min-w-[240px] max-h-[400px] overflow-y-auto">
+          <div className="sticky top-0 bg-[#1E1E1E] px-3 py-2 border-b border-[#3A3A3A]">
+            <span className="text-[10px] uppercase font-semibold text-[#6B6B65]">Multimodal Models</span>
+          </div>
           {MODELS.map((model) => (
             <button
               key={model.id}
@@ -102,6 +111,11 @@ function ModelSelector({ selectedModel, onModelChange, disabled }: { selectedMod
               <div className="text-[10px] text-[#6B6B65]">{model.provider}</div>
             </button>
           ))}
+          <div className="px-3 py-2 border-t border-[#3A3A3A] bg-[#1E1E1E]">
+            <p className="text-[10px] text-[#6B6B65] leading-relaxed">
+              💡 If one model is rate-limited, the system will automatically try others
+            </p>
+          </div>
         </div>
       )}
     </div>
@@ -481,14 +495,16 @@ export default function StudyPDFInterface() {
   }
 
   // API call with retry and fallback
-  const callAPI = async (userPrompt: string, retryCount = 0) => {
+  const callAPI = async (userPrompt: string, retryCount = 0, triedModels: string[] = []) => {
+    const currentModelToTry = retryCount === 0 ? selectedModel : MODELS.find(m => !triedModels.includes(m.id))?.id || selectedModel
+    
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           messages: [{ role: 'user', content: userPrompt }],
-          model: selectedModel,
+          model: currentModelToTry,
           stream: false,
         }),
       })
@@ -497,46 +513,29 @@ export default function StudyPDFInterface() {
         const errorData = await response.json().catch(() => ({}))
         
         // Handle rate limiting with automatic fallback
-        if (response.status === 429 || errorData.error?.code === 429) {
-          // If we haven't tried other models yet
-          if (retryCount === 0) {
-            // Try to find an alternative model
-            const currentModelIndex = MODELS.findIndex(m => m.id === selectedModel)
-            const nextModel = MODELS[(currentModelIndex + 1) % MODELS.length]
+        if (response.status === 429 || response.status === 500 || errorData.error?.code === 429) {
+          const updatedTriedModels = [...triedModels, currentModelToTry]
+          
+          // Try all available models
+          if (updatedTriedModels.length < MODELS.length) {
+            const nextModel = MODELS.find(m => !updatedTriedModels.includes(m.id))
             
-            console.log(`Rate limited on ${selectedModel}, trying ${nextModel.id}`)
-            
-            // Temporarily switch model and retry
-            const originalModel = selectedModel
-            setSelectedModel(nextModel.id)
-            
-            try {
-              const response = await fetch('/api/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  messages: [{ role: 'user', content: userPrompt }],
-                  model: nextModel.id,
-                  stream: false,
-                }),
-              })
+            if (nextModel) {
+              console.log(`Rate limited on ${currentModelToTry}, trying ${nextModel.id}`)
               
-              if (response.ok) {
-                const data = await response.json()
-                if (data.content) {
-                  return data.content
-                }
-              }
+              // Wait a bit before retrying
+              await new Promise(resolve => setTimeout(resolve, 1000))
               
-              // Restore original model if retry failed
-              setSelectedModel(originalModel)
-            } catch (retryError) {
-              setSelectedModel(originalModel)
-              throw retryError
+              // Update selected model in UI
+              setSelectedModel(nextModel.id)
+              
+              // Recursive retry with next model
+              return await callAPI(userPrompt, retryCount + 1, updatedTriedModels)
             }
           }
           
-          throw new Error('Rate limited. Please try again in a few moments, or switch to a different model.')
+          // All models tried, show error
+          throw new Error(`All ${MODELS.length} models are currently rate-limited. Please try again in a few moments.\n\nTried models:\n${updatedTriedModels.map(id => `- ${MODELS.find(m => m.id === id)?.name}`).join('\n')}`)
         }
         
         // Handle moderation errors
@@ -551,6 +550,12 @@ export default function StudyPDFInterface() {
       
       if (!data.content) {
         throw new Error('No response received')
+      }
+      
+      // Show success message if we had to switch models
+      if (retryCount > 0) {
+        const modelName = MODELS.find(m => m.id === currentModelToTry)?.name
+        console.log(`Successfully switched to ${modelName}`)
       }
       
       return data.content
@@ -694,13 +699,14 @@ Provide your answer:`
       const errorMessage = error instanceof Error ? error.message : 'An error occurred'
       
       // Check if it's a rate limit error and suggest alternative
-      let displayMessage = `**Error:** ${errorMessage}`
+      let displayMessage = `**⚠️ Error**\n\n${errorMessage}`
       
-      if (errorMessage.includes('Rate limited')) {
-        const availableModels = MODELS.filter(m => m.id !== selectedModel)
-        displayMessage = `**⚠️ Rate Limit Reached**\n\n${errorMessage}\n\n**Try these alternatives:**\n${availableModels.map(m => `- ${m.name} (${m.provider})`).join('\n')}\n\nYou can switch models using the dropdown in the header.`
+      if (errorMessage.includes('rate-limited') || errorMessage.includes('Rate limited')) {
+        displayMessage = `**⚠️ Rate Limit Reached**\n\n${errorMessage}\n\n**What you can do:**\n\n1. **Wait a moment** - Free tier models have usage limits\n2. **Try manually switching** to a different model using the dropdown above\n3. **Retry your question** - The system will automatically try other models\n\n*Tip: During peak hours, free models may be slower. Consider trying again later.*`
       } else if (errorMessage.includes('moderation')) {
-        displayMessage = `**⚠️ Content Moderation**\n\n${errorMessage}\n\n**Suggestions:**\n- Try rephrasing your question\n- Switch to a different model\n- Ask more specific questions about the document`
+        displayMessage = `**⚠️ Content Moderation**\n\n${errorMessage}\n\n**Suggestions:**\n- Try rephrasing your question more neutrally\n- Switch to a different model using the dropdown\n- Ask more specific questions about the document content`
+      } else if (errorMessage.includes('API Error: 500')) {
+        displayMessage = `**⚠️ Server Error**\n\nThe AI service is temporarily unavailable (Error 500).\n\n**Try these steps:**\n\n1. Wait 10-15 seconds and retry\n2. Switch to a different model\n3. If issue persists, the service may be experiencing high load\n\n*The system will automatically try alternative models.*`
       }
       
       setMessages(prev => [...prev, {
