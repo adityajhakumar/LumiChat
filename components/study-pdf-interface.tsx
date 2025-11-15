@@ -138,8 +138,9 @@ function PDFViewer({ pdfUrl, currentPage, setCurrentPage, zoom, setZoom, rotatio
         setPages(loadedPages)
         setLoading(false)
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load PDF'
         console.error('Error loading PDF:', error)
-        setError(error.message || 'Failed to load PDF')
+        setError(errorMessage)
         setLoading(false)
       }
     }
