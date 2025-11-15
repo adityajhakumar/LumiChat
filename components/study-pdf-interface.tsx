@@ -31,6 +31,26 @@ const MarkdownComponents = {
   a: ({...props}: any) => <a className="text-[#CC785C] hover:underline" {...props} />,
 }
 
+interface Message {
+  role: string;
+  content: string;
+  isUser: boolean;
+  citations?: number[];
+}
+
+interface PDFFile {
+  name: string;
+  url: string;
+  totalPages: number;
+  pages: Array<{ pageNumber: number; text: string }>;
+}
+
+interface PDFChunk {
+  text: string;
+  pageNumber: number;
+  score?: number;
+}
+
 // Model Selector Component
 function ModelSelector({ selectedModel, onModelChange, disabled }: { selectedModel: string; onModelChange: (model: string) => void; disabled?: boolean }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -120,7 +140,7 @@ function PDFViewer({ pdfUrl, currentPage, setCurrentPage, zoom, setZoom, rotatio
         const pdf = await pdfjsLib.getDocument(pdfUrl).promise
         setTotalPages(pdf.numPages)
 
-        const loadedPages = []
+        const loadedPages: Array<{ image: string; pageNumber: number }> = []
         for (let i = 1; i <= Math.min(pdf.numPages, 50); i++) {
           const page = await pdf.getPage(i)
           const canvas = document.createElement('canvas')
@@ -276,7 +296,7 @@ function PDFViewer({ pdfUrl, currentPage, setCurrentPage, zoom, setZoom, rotatio
 }
 
 // Message Component
-function Message({ message, onRetry }: { message: any; onRetry?: () => void }) {
+function Message({ message, onRetry }: { message: Message; onRetry?: () => void }) {
   if (message.isUser) {
     return (
       <div className="flex justify-end mb-4 animate-fadeIn">
@@ -309,7 +329,7 @@ function Message({ message, onRetry }: { message: any; onRetry?: () => void }) {
               <div className="mt-3 pt-3 border-t border-[#2E2E2E] flex items-center gap-2 flex-wrap">
                 <BookOpen size={12} className="text-[#CC785C]" />
                 <span className="text-xs text-[#6B6B65]">Referenced pages:</span>
-                {message.citations.map((cite: number, i) => (
+                {message.citations.map((cite: number, i: number) => (
                   <span key={i} className="text-xs px-2 py-0.5 bg-[#2A2A2A] rounded text-[#CC785C] border border-[#3A3A3A]">
                     {cite}
                   </span>
@@ -334,19 +354,19 @@ function Message({ message, onRetry }: { message: any; onRetry?: () => void }) {
 
 // Main Component
 export default function StudyPDFInterface() {
-  const [pdfFile, setPdfFile] = useState(null)
-  const [pdfChunks, setPdfChunks] = useState([])
+  const [pdfFile, setPdfFile] = useState<PDFFile | null>(null)
+  const [pdfChunks, setPdfChunks] = useState<PDFChunk[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [zoom, setZoom] = useState(100)
   const [rotation, setRotation] = useState(0)
   const [input, setInput] = useState('')
-  const [messages, setMessages] = useState([])
+  const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
   const [processingPDF, setProcessingPDF] = useState(false)
   const [selectedModel, setSelectedModel] = useState(MODELS[0].id)
   const [splitPosition, setSplitPosition] = useState(50)
   const [isDragging, setIsDragging] = useState(false)
-  const [lastQuery, setLastQuery] = useState(null)
+  const [lastQuery, setLastQuery] = useState<string | null>(null)
   
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -399,8 +419,8 @@ export default function StudyPDFInterface() {
   }, [isDragging, handleMouseMove, handleMouseUp])
 
   // Chunk PDF content
-  const chunkPDFContent = (pdfPages) => {
-    const chunks = []
+  const chunkPDFContent = (pdfPages: Array<{ pageNumber: number; text: string }>) => {
+    const chunks: PDFChunk[] = []
     const CHUNK_SIZE = 1000
     const OVERLAP = 200
 
@@ -429,7 +449,7 @@ export default function StudyPDFInterface() {
   }
 
   // Find relevant chunks
-  const findRelevantChunks = (query, chunks, topK = 5) => {
+  const findRelevantChunks = (query: string, chunks: PDFChunk[], topK = 5) => {
     const queryWords = query.toLowerCase()
       .split(/\s+/)
       .filter(w => w.length > 2)
@@ -455,13 +475,13 @@ export default function StudyPDFInterface() {
     })
 
     return scoredChunks
-      .filter(c => c.score > 0)
-      .sort((a, b) => b.score - a.score)
+      .filter(c => c.score && c.score > 0)
+      .sort((a, b) => (b.score || 0) - (a.score || 0))
       .slice(0, topK)
   }
 
   // API call with retry and fallback
-  const callAPI = async (userPrompt, retryCount = 0) => {
+  const callAPI = async (userPrompt: string, retryCount = 0) => {
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -541,7 +561,7 @@ export default function StudyPDFInterface() {
   }
 
   // Handle file selection
-  const handleFileSelect = async (e) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || file.type !== 'application/pdf') {
       alert('Please select a valid PDF file')
@@ -563,13 +583,13 @@ export default function StudyPDFInterface() {
         'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'
       
       const pdf = await pdfjsLib.getDocument({ data: buffer }).promise
-      const pdfPages = []
+      const pdfPages: Array<{ pageNumber: number; text: string }> = []
       
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i)
         const textContent = await page.getTextContent()
         const text = textContent.items
-          .map(item => item.str || '')
+          .map((item: any) => item.str || '')
           .join(' ')
           .trim()
           .replace(/\s+/g, ' ')
@@ -593,7 +613,7 @@ export default function StudyPDFInterface() {
     } catch (err) {
       console.error('Error processing PDF:', err)
       setProcessingPDF(false)
-      alert(`Failed to process PDF: ${err.message}`)
+      alert(`Failed to process PDF: ${err instanceof Error ? err.message : 'Unknown error'}`)
     }
   }
 
@@ -602,7 +622,7 @@ export default function StudyPDFInterface() {
     if (!input.trim() || !pdfFile || loading) return
 
     const userQuestion = input.trim()
-    const userMessage = { role: 'user', content: userQuestion, isUser: true }
+    const userMessage: Message = { role: 'user', content: userQuestion, isUser: true }
     
     // Store query for retry
     setLastQuery(userQuestion)
@@ -614,7 +634,7 @@ export default function StudyPDFInterface() {
     try {
       // Check if question is about specific page
       const pageMatch = userQuestion.match(/page\s+(\d+)/i)
-      let relevantChunks = []
+      let relevantChunks: PDFChunk[] = []
       
       if (pageMatch) {
         const requestedPage = parseInt(pageMatch[1])
@@ -671,7 +691,7 @@ Provide your answer:`
         citations: citations.length > 0 ? citations : undefined
       }])
     } catch (error) {
-      const errorMessage = error.message || 'An error occurred'
+      const errorMessage = error instanceof Error ? error.message : 'An error occurred'
       
       // Check if it's a rate limit error and suggest alternative
       let displayMessage = `**Error:** ${errorMessage}`
@@ -838,7 +858,7 @@ Provide your answer:`
           ) : (
             <>
               {messages.map((msg, i) => (
-                <Message key={i} message={msg} onRetry={msg.content?.includes('**Error:**') || msg.content?.includes('**⚠️') ? handleRetry : null} />
+                <Message key={i} message={msg} onRetry={msg.content?.includes('**Error:**') || msg.content?.includes('**⚠️') ? handleRetry : undefined} />
               ))}
               {loading && (
                 <div className="flex justify-start mb-6 animate-fadeIn">
