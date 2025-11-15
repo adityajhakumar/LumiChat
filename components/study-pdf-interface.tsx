@@ -94,7 +94,7 @@ function PDFViewer({ pdfUrl, currentPage, setCurrentPage, zoom, setZoom, rotatio
   currentPage: number;
   setCurrentPage: (page: number) => void;
   zoom: number;
-  setZoom: (zoom: number) => void;
+  setZoom: (zoom: number | ((prev: number) => number)) => void;
   rotation: number;
   setRotation: (rotation: number) => void;
 }) {
@@ -149,11 +149,11 @@ function PDFViewer({ pdfUrl, currentPage, setCurrentPage, zoom, setZoom, rotatio
   }, [pdfUrl])
 
   const handleZoom = (direction: 'in' | 'out') => {
-    setZoom((prev: number) => {
-      if (direction === 'in' && prev < 200) return prev + 25
-      if (direction === 'out' && prev > 50) return prev - 25
-      return prev
-    })
+    if (direction === 'in' && zoom < 200) {
+      setZoom(zoom + 25)
+    } else if (direction === 'out' && zoom > 50) {
+      setZoom(zoom - 25)
+    }
   }
 
   if (loading) {
