@@ -30,54 +30,105 @@ const MODELS = [
 function CodeBlock({ code, language = "javascript" }: { code: string; language?: string }) {
   const codeRef = useRef<HTMLElement>(null)
   const [copied, setCopied] = useState(false)
+  const [highlighted, setHighlighted] = useState(false)
 
   useEffect(() => {
+    let mounted = true
+
     const loadPrism = async () => {
-      if (typeof window === "undefined") return
+      if (typeof window === "undefined" || !mounted) return
 
-      // Only load once
-      if (!window.__prismLoaded) {
-        const link = document.createElement("link")
-        link.rel = "stylesheet"
-        link.href = "https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css"
-        document.head.appendChild(link)
+      try {
+        // Only load once globally
+        if (!window.__prismLoaded) {
+          // Load CSS
+          const link = document.createElement("link")
+          link.rel = "stylesheet"
+          link.href = "https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css"
+          document.head.appendChild(link)
 
-        const script = document.createElement("script")
-        script.src = "https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"
-        script.onload = () => {
+          // Load main Prism script and wait for it
+          await new Promise<void>((resolve, reject) => {
+            const script = document.createElement("script")
+            script.src = "https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"
+            script.crossOrigin = "anonymous"
+            script.onload = () => resolve()
+            script.onerror = () => reject(new Error("Failed to load Prism"))
+            document.head.appendChild(script)
+          })
+
+          // Load all language components in parallel
+          const langs = ["python", "javascript", "typescript", "jsx", "tsx", "css", "markup", 
+                        "json", "bash", "sql", "java", "cpp", "c", "csharp", "go", "rust", 
+                        "ruby", "php"]
+          
+          await Promise.all(
+            langs.map(lang => 
+              new Promise<void>((resolve) => {
+                const langScript = document.createElement("script")
+                langScript.src = `https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-${lang}.min.js`
+                langScript.crossOrigin = "anonymous"
+                langScript.onload = () => resolve()
+                langScript.onerror = () => resolve() // Don't block on individual language failures
+                document.head.appendChild(langScript)
+              })
+            )
+          )
+
           window.__prismLoaded = true
-          const langs = [
-            "python", "javascript", "typescript", "jsx", "tsx", "css", "markup",
-            "json", "bash", "sql", "java", "cpp", "c", "csharp", "go", "rust",
-            "ruby", "php", "arduino"
-          ]
-          langs.forEach((lang) => {
-            const langScript = document.createElement("script")
-            langScript.src = `https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-${lang}.min.js`
-            document.head.appendChild(langScript)
+        }
+
+        // Wait for Prism to be fully ready
+        let attempts = 0
+        const maxAttempts = 50
+        
+        const waitForPrism = (): Promise<void> => {
+          return new Promise((resolve) => {
+            const check = () => {
+              attempts++
+              if (window.Prism && window.Prism.languages) {
+                resolve()
+              } else if (attempts < maxAttempts && mounted) {
+                setTimeout(check, 100)
+              } else {
+                resolve() // Give up after max attempts
+              }
+            }
+            check()
           })
         }
-        document.head.appendChild(script)
-      }
 
-      // Wait for scripts, then highlight
-      const tryHighlight = () => {
-        if (window.Prism && codeRef.current) {
-          window.Prism.highlightElement(codeRef.current)
-        } else {
-          requestAnimationFrame(tryHighlight)
+        await waitForPrism()
+
+        // Now highlight
+        if (window.Prism && codeRef.current && !highlighted && mounted) {
+          try {
+            window.Prism.highlightElement(codeRef.current)
+            setHighlighted(true)
+          } catch (err) {
+            console.warn("Prism highlighting failed:", err)
+          }
         }
+      } catch (error) {
+        console.warn("Error loading Prism:", error)
       }
-      tryHighlight()
     }
 
     loadPrism()
-  }, [code, language])
+
+    return () => {
+      mounted = false
+    }
+  }, [code, language, highlighted])
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(code)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    try {
+      await navigator.clipboard.writeText(code)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch (err) {
+      console.error("Copy failed:", err)
+    }
   }
 
   const langMap: Record<string, string> = {
@@ -122,6 +173,7 @@ function CodeBlock({ code, language = "javascript" }: { code: string; language?:
             className={`language-${prismLang}`}
             style={{
               fontFamily: '"Fira Code", "Cascadia Code", "SF Mono", Menlo, Consolas, monospace',
+              color: highlighted ? undefined : '#E8E8E3', // Fallback color if not highlighted
             }}
           >
             {code}
