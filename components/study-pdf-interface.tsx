@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { FileUp, X, Send, Sparkles, BookOpen, Loader2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, Maximize2, GripVertical, FileText, AlertCircle, MessageSquare, Bot, Camera, ExternalLink, Copy, Check } from 'lucide-react'
+import { FileUp, X, Send, Sparkles, BookOpen, Loader2, ChevronLeft, ChevronRight, ZoomIn, ZoomOut, RotateCw, GripVertical, FileText, AlertCircle, MessageSquare, Bot, Camera, ExternalLink, Copy, Check } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -10,6 +10,7 @@ declare global {
   interface Window {
     Prism?: any
     __prismLoaded?: boolean
+    pdfjsLib?: any
   }
 }
 
@@ -26,7 +27,7 @@ const MODELS = [
   { id: "meta-llama/llama-4-scout:free", name: "Llama 4 Scout", provider: "Meta" },
 ]
 
-// CodeBlock Component with Prism syntax highlighting
+// CodeBlock Component with FIXED Prism syntax highlighting
 function CodeBlock({ code, language = "javascript" }: { code: string; language?: string }) {
   const codeRef = useRef<HTMLElement>(null)
   const [copied, setCopied] = useState(false)
@@ -57,28 +58,36 @@ function CodeBlock({ code, language = "javascript" }: { code: string; language?:
             document.head.appendChild(script)
           })
 
-          // Load all language components in parallel
+          // Wait for Prism to be fully initialized
+          await new Promise(resolve => setTimeout(resolve, 150))
+
+          // Load language components SEQUENTIALLY to prevent race conditions
           const langs = ["python", "javascript", "typescript", "jsx", "tsx", "css", "markup", 
                         "json", "bash", "sql", "java", "cpp", "c", "csharp", "go", "rust", 
                         "ruby", "php"]
           
-          await Promise.all(
-            langs.map(lang => 
-              new Promise<void>((resolve) => {
+          for (const lang of langs) {
+            if (!mounted) break
+            try {
+              await new Promise<void>((resolve) => {
                 const langScript = document.createElement("script")
                 langScript.src = `https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-${lang}.min.js`
                 langScript.crossOrigin = "anonymous"
-                langScript.onload = () => resolve()
+                langScript.onload = () => {
+                  setTimeout(() => resolve(), 50) // Small delay after each language loads
+                }
                 langScript.onerror = () => resolve() // Don't block on individual language failures
                 document.head.appendChild(langScript)
               })
-            )
-          )
+            } catch {
+              // Continue loading other languages
+            }
+          }
 
           window.__prismLoaded = true
         }
 
-        // Wait for Prism to be fully ready
+        // Wait for Prism to be fully ready with proper language support
         let attempts = 0
         const maxAttempts = 50
         
@@ -86,7 +95,11 @@ function CodeBlock({ code, language = "javascript" }: { code: string; language?:
           return new Promise((resolve) => {
             const check = () => {
               attempts++
-              if (window.Prism && window.Prism.languages) {
+              // Check if Prism and its languages object exist and are fully initialized
+              if (window.Prism && 
+                  window.Prism.languages && 
+                  typeof window.Prism.highlightElement === 'function' &&
+                  Object.keys(window.Prism.languages).length > 1) {
                 resolve()
               } else if (attempts < maxAttempts && mounted) {
                 setTimeout(check, 100)
@@ -100,17 +113,44 @@ function CodeBlock({ code, language = "javascript" }: { code: string; language?:
 
         await waitForPrism()
 
-        // Now highlight
-        if (window.Prism && codeRef.current && !highlighted && mounted) {
+        // Now highlight with additional safety checks
+        if (window.Prism && 
+            window.Prism.languages && 
+            codeRef.current && 
+            !highlighted && 
+            mounted) {
           try {
-            window.Prism.highlightElement(codeRef.current)
+            // Map language aliases
+            const langMap: Record<string, string> = {
+              js: "javascript",
+              ts: "typescript",
+              py: "python",
+              rb: "ruby",
+              sh: "bash",
+              yml: "yaml",
+              md: "markdown",
+              html: "markup",
+              xml: "markup",
+            }
+            
+            const prismLang = langMap[language.toLowerCase()] || language.toLowerCase()
+            
+            // Verify the language exists before highlighting
+            if (window.Prism.languages[prismLang]) {
+              window.Prism.highlightElement(codeRef.current)
+              setHighlighted(true)
+            } else {
+              // Fallback to plain text highlighting
+              setHighlighted(true)
+            }
+          } catch {
+            // Silently fail - code will display without syntax highlighting
             setHighlighted(true)
-          } catch (err) {
-            console.warn("Prism highlighting failed:", err)
           }
         }
-      } catch (error) {
-        console.warn("Error loading Prism:", error)
+      } catch {
+        // Silent fallback - code displays without highlighting
+        setHighlighted(true)
       }
     }
 
@@ -184,7 +224,7 @@ function CodeBlock({ code, language = "javascript" }: { code: string; language?:
   )
 }
 
-// Markdown Components with Claude-like styling and syntax highlighting
+// Markdown Components with Claude-like styling
 const MarkdownComponents = {
   h1: ({...props}: any) => <h1 className="text-2xl font-semibold mt-6 mb-4 text-[#E8E8E3] leading-tight" {...props} />,
   h2: ({...props}: any) => <h2 className="text-xl font-semibold mt-5 mb-3 text-[#E8E8E3] leading-tight" {...props} />,
@@ -206,7 +246,6 @@ const MarkdownComponents = {
       : <CodeBlock code={String(children).replace(/\n$/, '')} language="text" />
   },
   pre: ({children, ...props}: any) => {
-    // Extract code from pre > code structure
     if (children?.type === 'code') {
       return children
     }
@@ -216,7 +255,6 @@ const MarkdownComponents = {
   strong: ({...props}: any) => <strong className="font-semibold text-[#E8E8E3]" {...props} />,
   em: ({...props}: any) => <em className="italic text-[#D4D4CF]" {...props} />,
   a: ({href, children, ...props}: any) => {
-    // Ensure external links open in new tab and have proper protocol
     const isExternal = href && !href.startsWith('#') && !href.startsWith('/')
     const finalHref = href && !href.startsWith('http') && !href.startsWith('#') && !href.startsWith('/') 
       ? `https://${href}` 
@@ -350,8 +388,15 @@ function PDFViewer({ pdfUrl, currentPage, setCurrentPage, zoom, setZoom, rotatio
         setError(null)
         setLoading(true)
         
+        // Load PDF.js library if not already loaded
         if (!window.pdfjsLib) {
-          throw new Error('PDF.js library not loaded')
+          await new Promise<void>((resolve, reject) => {
+            const script = document.createElement('script')
+            script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
+            script.onload = () => resolve()
+            script.onerror = () => reject(new Error('Failed to load PDF.js'))
+            document.head.appendChild(script)
+          })
         }
         
         const pdfjsLib = window.pdfjsLib
@@ -655,7 +700,6 @@ export default function StudyPDFInterface() {
       const pageNum = pageIndex + 1
       const text = pageData.text
       
-      // For image-based pages, create a single chunk with the marker
       if (pageData.hasImage || text.includes('[Page') && text.includes('Image-based content]')) {
         chunks.push({
           text: `Page ${pageNum} contains visual/image content that requires visual analysis.`,
@@ -716,30 +760,22 @@ export default function StudyPDFInterface() {
       .slice(0, topK)
   }
 
-  // API call with retry and fallback - now supports images
+  // API call with retry and fallback
   const callAPI = async (userPrompt: string, images?: string[], retryCount = 0, triedModels: string[] = []): Promise<string> => {
     const currentModelToTry = retryCount === 0 ? selectedModel : MODELS.find(m => !triedModels.includes(m.id))?.id || selectedModel
     
     try {
-      // Prepare messages with images if available
       let messageContent: any = userPrompt
       
       if (images && images.length > 0) {
-        // For vision requests, send images inline
         const contentArray: Array<{type: string; text?: string; image_url?: {url: string}}> = [
-          { 
-            type: "text", 
-            text: userPrompt 
-          }
+          { type: "text", text: userPrompt }
         ]
         
-        // Add up to 4 images (API limit for most models)
         images.slice(0, 4).forEach(imageData => {
           contentArray.push({
             type: "image_url",
-            image_url: {
-              url: imageData
-            }
+            image_url: { url: imageData }
           })
         })
         
@@ -750,12 +786,7 @@ export default function StudyPDFInterface() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: [
-            {
-              role: "user",
-              content: messageContent
-            }
-          ],
+          messages: [{ role: "user", content: messageContent }],
           model: currentModelToTry,
           stream: false,
         }),
@@ -764,33 +795,22 @@ export default function StudyPDFInterface() {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         
-        // Handle rate limiting with automatic fallback
         if (response.status === 429 || response.status === 500 || errorData.error?.code === 429) {
           const updatedTriedModels = [...triedModels, currentModelToTry]
           
-          // Try all available models
           if (updatedTriedModels.length < MODELS.length) {
             const nextModel = MODELS.find(m => !updatedTriedModels.includes(m.id))
             
             if (nextModel) {
-              console.log(`Rate limited on ${currentModelToTry}, trying ${nextModel.id}`)
-              
-              // Wait a bit before retrying
               await new Promise(resolve => setTimeout(resolve, 1000))
-              
-              // Update selected model in UI
               setSelectedModel(nextModel.id)
-              
-              // Recursive retry with next model
               return await callAPI(userPrompt, images, retryCount + 1, updatedTriedModels)
             }
           }
           
-          // All models tried, show error
-          throw new Error(`All ${MODELS.length} models are currently rate-limited. Please try again in a few moments.\n\nTried models:\n${updatedTriedModels.map(id => `- ${MODELS.find(m => m.id === id)?.name}`).join('\n')}`)
+          throw new Error(`All ${MODELS.length} models are currently rate-limited. Please try again in a few moments.`)
         }
         
-        // Handle moderation errors
         if (response.status === 403 || errorData.error?.code === 403) {
           throw new Error('Content moderation flagged this request. Please try a different model or rephrase your question.')
         }
@@ -799,36 +819,10 @@ export default function StudyPDFInterface() {
       }
 
       const data = await response.json()
-      
-      console.log('API Response:', data) // Debug log
-      
-      // Handle different response formats
-      let content = data.content
-      
-      // OpenRouter sometimes returns choices array
-      if (!content && data.choices && data.choices.length > 0) {
-        content = data.choices[0].message?.content
-      }
-      
-      // Some models return text directly
-      if (!content && data.text) {
-        content = data.text
-      }
-      
-      // Last resort - check for message.content
-      if (!content && data.message?.content) {
-        content = data.message.content
-      }
+      let content = data.content || data.choices?.[0]?.message?.content || data.text || data.message?.content
       
       if (!content) {
-        console.error('Unexpected API response format:', data)
         throw new Error('No content in API response. Response format may have changed.')
-      }
-      
-      // Show success message if we had to switch models
-      if (retryCount > 0) {
-        const modelName = MODELS.find(m => m.id === currentModelToTry)?.name
-        console.log(`Successfully switched to ${modelName}`)
       }
       
       return content
@@ -839,7 +833,7 @@ export default function StudyPDFInterface() {
     }
   }
 
-  // Handle file selection with advanced PDF processing
+  // Handle file selection
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || file.type !== 'application/pdf') {
@@ -854,7 +848,13 @@ export default function StudyPDFInterface() {
       const buffer = await file.arrayBuffer()
       
       if (!window.pdfjsLib) {
-        throw new Error('PDF.js library not loaded')
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement('script')
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js'
+          script.onload = () => resolve()
+          script.onerror = () => reject(new Error('Failed to load PDF.js'))
+          document.head.appendChild(script)
+        })
       }
       
       const pdfjsLib = window.pdfjsLib
@@ -865,11 +865,9 @@ export default function StudyPDFInterface() {
       const pdfPages: Array<{ pageNumber: number; text: string; hasImage: boolean }> = []
       const pdfImages: string[] = []
       
-      // Extract both text and images from each page
       for (let i = 1; i <= pdf.numPages; i++) {
         const page = await pdf.getPage(i)
         
-        // Extract text
         const textContent = await page.getTextContent()
         const text = textContent.items
           .map((item: any) => item.str || '')
@@ -877,10 +875,8 @@ export default function StudyPDFInterface() {
           .trim()
           .replace(/\s+/g, ' ')
         
-        // Check if page has meaningful text (more than just a few characters)
         const hasText = text.replace(/\s/g, '').length > 50
         
-        // Extract image if text is insufficient
         let hasImage = false
         if (!hasText || text.length < 100) {
           try {
@@ -909,10 +905,8 @@ export default function StudyPDFInterface() {
       }
       
       const chunks = chunkPDFContent(pdfPages)
-      
-      // Determine if this is an image-heavy PDF
       const imagePages = pdfPages.filter(p => p.hasImage).length
-      const isImageHeavy = imagePages > pdf.numPages * 0.3 // More than 30% are images
+      const isImageHeavy = imagePages > pdf.numPages * 0.3
       
       setPdfFile({ 
         name: file.name, 
@@ -949,14 +943,11 @@ export default function StudyPDFInterface() {
     const userQuestion = input.trim()
     const userMessage: Message = { role: 'user', content: userQuestion, isUser: true }
     
-    // Store query for retry
     setLastQuery(userQuestion)
-    
     setMessages(prev => [...prev, userMessage])
     setInput('')
     setLoading(true)
 
-    // Show helpful message if processing image-heavy PDF
     if (pdfFile.isImageHeavy) {
       setMessages(prev => [...prev, {
         role: 'assistant',
@@ -965,34 +956,25 @@ export default function StudyPDFInterface() {
       }])
     }
 
-    // Declare imagePagesToSend in the outer scope
     let imagePagesToSend: string[] = []
 
     try {
-      // Check if question is about specific page
       const pageMatch = userQuestion.match(/page\s+(\d+)/i)
       let relevantChunks: PDFChunk[] = []
       
       if (pageMatch) {
         const requestedPage = parseInt(pageMatch[1])
-        // Get all chunks from the requested page
         relevantChunks = pdfChunks.filter(chunk => chunk.pageNumber === requestedPage)
         
-        // If no chunks found for that page, get surrounding pages
         if (relevantChunks.length === 0) {
           relevantChunks = pdfChunks.filter(chunk => 
             Math.abs(chunk.pageNumber - requestedPage) <= 1
           )
         }
       } else {
-        // Use semantic search for general questions
         relevantChunks = findRelevantChunks(userQuestion, pdfChunks, 5)
         
-        // IMPORTANT: Always include current visible page for context
-        // This ensures the AI can see what the user is looking at
         const currentPageChunks = pdfChunks.filter(chunk => chunk.pageNumber === currentPage)
-        
-        // Add current page chunks if not already included
         currentPageChunks.forEach(chunk => {
           if (!relevantChunks.find(c => c.pageNumber === chunk.pageNumber && c.text === chunk.text)) {
             relevantChunks.push(chunk)
@@ -1000,7 +982,6 @@ export default function StudyPDFInterface() {
         })
       }
       
-      // Fallback: if no relevant chunks found, use current page context
       if (relevantChunks.length === 0) {
         relevantChunks = pdfChunks.filter(chunk => 
           Math.abs(chunk.pageNumber - currentPage) <= 1
@@ -1013,10 +994,8 @@ export default function StudyPDFInterface() {
 
       const citations = [...new Set(relevantChunks.map(c => c.pageNumber))].sort((a, b) => a - b)
 
-      // Check if we need to include images for better context
       imagePagesToSend = []
       if (pdfFile.images && pdfFile.images.length > 0) {
-        // Always try to include the current visible page image
         const currentPageData = pdfFile.pages.find(p => p.pageNumber === currentPage)
         if (currentPageData?.hasImage) {
           const imageIndex = pdfFile.pages
@@ -1027,10 +1006,9 @@ export default function StudyPDFInterface() {
           }
         }
         
-        // Also include images from other cited pages if image-heavy document
         if (pdfFile.isImageHeavy) {
           citations.forEach(pageNum => {
-            if (pageNum === currentPage) return // Already added
+            if (pageNum === currentPage) return
             const page = pdfFile.pages.find(p => p.pageNumber === pageNum)
             if (page?.hasImage && pdfFile.images) {
               const imageIndex = pdfFile.pages
@@ -1060,30 +1038,18 @@ Instructions:
 - **CRITICAL: When displaying code, ALWAYS wrap it in markdown code blocks with the language specified**
   Example: \`\`\`cpp\n// code here\n\`\`\`
   Example: \`\`\`python\n# code here\n\`\`\`
-  Example: \`\`\`javascript\n// code here\n\`\`\`
-- Use proper markdown formatting:
-  - Headers: # ## ###
-  - Bold: **text**
-  - Lists: - or 1.
-  - Code blocks: \`\`\`language\n...\n\`\`\`
-  - Inline code: \`code\`
+- Use proper markdown formatting with headers, bold, lists, code blocks
 - Be specific and reference page numbers when appropriate
-- If images are provided, analyze their visual content in detail and extract any code you see
-- If the question asks about "this page" or "what code", refer to page ${currentPage}
-- When explaining code, break it down section by section with clear explanations
-- If you need to see different pages, ask the user to specify
+- If images are provided, analyze their visual content in detail
+- If the question asks about "this page", refer to page ${currentPage}
 
 Provide your answer:`
 
-      // Call API with images if available
       const content = await callAPI(prompt, imagePagesToSend.length > 0 ? imagePagesToSend : undefined)
 
-      // Post-process: Ensure code snippets are properly formatted
       let formattedContent = content
       
-      // Detect common code patterns and wrap them if not already in code blocks
       if (!formattedContent.includes('```')) {
-        // Check for Arduino/C/C++ style code patterns
         const codePatterns = [
           /\b(digitalWrite|pinMode|delay|Serial\.|if|while|for)\s*\(/gi,
           /\b(int|void|float|char|const)\s+\w+\s*[=;(]/gi,
@@ -1092,7 +1058,6 @@ Provide your answer:`
         const hasCode = codePatterns.some(pattern => pattern.test(formattedContent))
         
         if (hasCode) {
-          // Try to extract and format code sections
           const lines = formattedContent.split('\n')
           let inCodeBlock = false
           let codeLines: string[] = []
@@ -1109,7 +1074,6 @@ Provide your answer:`
             } else if (isCodeLine && inCodeBlock) {
               codeLines.push(line)
             } else if (!isCodeLine && inCodeBlock) {
-              // End of code block
               newLines.push('```cpp')
               newLines.push(...codeLines)
               newLines.push('```')
@@ -1120,7 +1084,6 @@ Provide your answer:`
               newLines.push(line)
             }
             
-            // Handle last line
             if (index === lines.length - 1 && inCodeBlock) {
               newLines.push('```cpp')
               newLines.push(...codeLines)
@@ -1134,7 +1097,6 @@ Provide your answer:`
         }
       }
 
-      // Remove temporary "analyzing" message if it exists
       setMessages(prev => {
         const filtered = prev.filter(m => !m.content.includes('🔍 Analyzing document'))
         return [...filtered, {
@@ -1148,24 +1110,10 @@ Provide your answer:`
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'An error occurred'
       
-      console.error('Message send error:', {
-        error: errorMessage,
-        hadImages: imagePagesToSend.length > 0,
-        imageCount: imagePagesToSend.length,
-        model: selectedModel
-      })
-      
-      // Check if it's a rate limit error and suggest alternative
       let displayMessage = `**⚠️ Error**\n\n${errorMessage}`
       
-      if (errorMessage.includes('rate-limited') || errorMessage.includes('Rate limited')) {
-        displayMessage = `**⚠️ Rate Limit Reached**\n\n${errorMessage}\n\n**What you can do:**\n\n1. **Wait a moment** - Free tier models have usage limits\n2. **Try manually switching** to a different model using the dropdown above\n3. **Retry your question** - The system will automatically try other models\n\n*Tip: During peak hours, free models may be slower. Consider trying again later.*`
-      } else if (errorMessage.includes('moderation')) {
-        displayMessage = `**⚠️ Content Moderation**\n\n${errorMessage}\n\n**Suggestions:**\n- Try rephrasing your question more neutrally\n- Switch to a different model using the dropdown\n- Ask more specific questions about the document content`
-      } else if (errorMessage.includes('API Error: 500')) {
-        displayMessage = `**⚠️ Server Error**\n\nThe AI service is temporarily unavailable (Error 500).\n\n**Try these steps:**\n\n1. Wait 10-15 seconds and retry\n2. Switch to a different model\n3. If issue persists, the service may be experiencing high load\n\n*The system will automatically try alternative models.*`
-      } else if (errorMessage.includes('No content in API response')) {
-        displayMessage = `**⚠️ API Response Error**\n\nThe API returned a response but in an unexpected format.\n\n**This might mean:**\n- The API endpoint needs to be updated for vision support\n- The model doesn't support images\n- Check browser console for the actual response\n\n**Try:**\n1. Using a different model\n2. Asking about text-only pages\n3. Checking if images are too large`
+      if (errorMessage.includes('rate-limited')) {
+        displayMessage = `**⚠️ Rate Limit Reached**\n\n${errorMessage}\n\n**Try:** Wait a moment or manually switch models.`
       }
       
       setMessages(prev => [...prev, {
@@ -1185,7 +1133,6 @@ Provide your answer:`
     }
   }
 
-  // Retry last query
   const handleRetry = () => {
     if (lastQuery && !loading) {
       setInput(lastQuery)
@@ -1193,10 +1140,9 @@ Provide your answer:`
     }
   }
 
-  // Upload state
   if (processingPDF) {
     return (
-      <div className="flex items-center justify-center h-full bg-[#1A1A1A]">
+      <div className="flex items-center justify-center h-screen bg-[#1A1A1A]">
         <div className="text-center">
           <Loader2 className="w-14 h-14 animate-spin text-[#AB7C5F] mx-auto mb-4" />
           <p className="text-[#E8E8E3] text-lg font-medium">Processing PDF...</p>
@@ -1208,7 +1154,7 @@ Provide your answer:`
 
   if (!pdfFile) {
     return (
-      <div className="flex items-center justify-center h-full bg-[#1A1A1A]">
+      <div className="flex items-center justify-center h-screen bg-[#1A1A1A]">
         <div className="text-center px-4 max-w-md">
           <div className="w-20 h-20 rounded-full bg-[#2A2A2A] border-2 border-[#3A3A3A] flex items-center justify-center mx-auto mb-6">
             <FileUp size={40} className="text-[#AB7C5F]" />
@@ -1235,11 +1181,10 @@ Provide your answer:`
     )
   }
 
-  // Main interface with split panels
   return (
     <div 
       ref={splitContainerRef}
-      className="flex h-full bg-[#1A1A1A] overflow-hidden select-none"
+      className="flex h-screen bg-[#1A1A1A] overflow-hidden select-none"
       style={{ cursor: isDragging ? 'col-resize' : 'default' }}
     >
       {/* Left Panel - Chat */}
