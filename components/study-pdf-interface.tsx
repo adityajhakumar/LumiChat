@@ -5,7 +5,7 @@ import { FileUp, X, Send, Sparkles, BookOpen, Loader2, ChevronLeft, ChevronRight
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
-// Declare Prism global
+// Declare global types
 declare global {
   interface Window {
     Prism?: any
@@ -13,6 +13,9 @@ declare global {
     pdfjsLib?: any
   }
 }
+
+// Ensure this is treated as a module
+export {}
 
 // Model configurations - All multimodal models for better fallback
 const MODELS = [
