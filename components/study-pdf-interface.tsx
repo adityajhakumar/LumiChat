@@ -495,7 +495,7 @@ export default function StudyPDFInterface() {
   }
 
   // API call with retry and fallback
-  const callAPI = async (userPrompt: string, retryCount = 0, triedModels: string[] = []) => {
+  const callAPI = async (userPrompt: string, retryCount = 0, triedModels: string[] = []): Promise<string> => {
     const currentModelToTry = retryCount === 0 ? selectedModel : MODELS.find(m => !triedModels.includes(m.id))?.id || selectedModel
     
     try {
