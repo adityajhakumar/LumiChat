@@ -1044,13 +1044,7 @@ Format as JSON with this structure:
             </div>
           </div>
         )}
-        <StudyPDFInterface
-          selectedModel={selectedModel}
-          onModelChange={onModelChange}
-          onTokenCountChange={onTokenCountChange}
-          messages={messages}
-          onMessagesChange={onMessagesChange}
-        />
+        <StudyPDFInterface />
       </div>
     )
   }
