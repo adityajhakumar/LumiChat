@@ -100,7 +100,7 @@ function PDFViewer({ pdfUrl, currentPage, setCurrentPage, zoom, setZoom, rotatio
 }) {
   const [pages, setPages] = useState<Array<{ image: string; pageNumber: number }>>([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
+  const [error, setError] = useState<string | null>(null)
   const [totalPages, setTotalPages] = useState(0)
 
   useEffect(() => {
