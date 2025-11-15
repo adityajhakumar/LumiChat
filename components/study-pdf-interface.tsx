@@ -761,6 +761,9 @@ export default function StudyPDFInterface() {
       }])
     }
 
+    // Declare imagePagesToSend in the outer scope
+    let imagePagesToSend: string[] = []
+
     try {
       // Check if question is about specific page
       const pageMatch = userQuestion.match(/page\s+(\d+)/i)
@@ -796,7 +799,7 @@ export default function StudyPDFInterface() {
       const citations = [...new Set(relevantChunks.map(c => c.pageNumber))].sort((a, b) => a - b)
 
       // Check if we need to include images for better context
-      const imagePagesToSend: string[] = []
+      imagePagesToSend = []
       if (pdfFile.images && pdfFile.images.length > 0 && pdfFile.isImageHeavy) {
         citations.forEach(pageNum => {
           const page = pdfFile.pages.find(p => p.pageNumber === pageNum)
