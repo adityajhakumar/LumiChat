@@ -34,7 +34,7 @@ const MarkdownComponents = {
 // Model Selector Component
 function ModelSelector({ selectedModel, onModelChange, disabled }: { selectedModel: string; onModelChange: (model: string) => void; disabled?: boolean }) {
   const [isOpen, setIsOpen] = useState(false)
-  const dropdownRef = useRef(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -347,10 +347,10 @@ export default function StudyPDFInterface() {
   const [isDragging, setIsDragging] = useState(false)
   const [lastQuery, setLastQuery] = useState(null)
   
-  const fileInputRef = useRef(null)
-  const messagesEndRef = useRef(null)
-  const textareaRef = useRef(null)
-  const splitContainerRef = useRef(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const splitContainerRef = useRef<HTMLDivElement>(null)
 
   // Auto-scroll messages
   useEffect(() => {
