@@ -32,7 +32,7 @@ const MarkdownComponents = {
 }
 
 // Model Selector Component
-function ModelSelector({ selectedModel, onModelChange, disabled }) {
+function ModelSelector({ selectedModel, onModelChange, disabled }: { selectedModel: string; onModelChange: (model: string) => void; disabled?: boolean }) {
   const [isOpen, setIsOpen] = useState(false)
   const dropdownRef = useRef(null)
 
@@ -89,7 +89,15 @@ function ModelSelector({ selectedModel, onModelChange, disabled }) {
 }
 
 // PDF Viewer Component
-function PDFViewer({ pdfUrl, currentPage, setCurrentPage, zoom, setZoom, rotation, setRotation }) {
+function PDFViewer({ pdfUrl, currentPage, setCurrentPage, zoom, setZoom, rotation, setRotation }: {
+  pdfUrl: string;
+  currentPage: number;
+  setCurrentPage: (page: number) => void;
+  zoom: number;
+  setZoom: (zoom: number) => void;
+  rotation: number;
+  setRotation: (rotation: number) => void;
+}) {
   const [pages, setPages] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -267,7 +275,7 @@ function PDFViewer({ pdfUrl, currentPage, setCurrentPage, zoom, setZoom, rotatio
 }
 
 // Message Component
-function Message({ message, onRetry }) {
+function Message({ message, onRetry }: { message: any; onRetry?: () => void }) {
   if (message.isUser) {
     return (
       <div className="flex justify-end mb-4 animate-fadeIn">
