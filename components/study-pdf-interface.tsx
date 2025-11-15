@@ -69,8 +69,6 @@ function ModelSelector({ selectedModel, onModelChange, disabled }: { selectedMod
     const handleClickOutside = (e: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsOpen(false)
-      } else if (errorMessage.includes('No content in API response')) {
-        displayMessage = `**⚠️ API Response Error**\n\nThe API returned a response but in an unexpected format.\n\n**This might mean:**\n- The API endpoint needs to be updated for vision support\n- The model doesn't support images\n- Check browser console for the actual response\n\n**Try:**\n1. Using a different model\n2. Asking about text-only pages\n3. Checking if images are too large`
       }
     }
     document.addEventListener("mousedown", handleClickOutside)
@@ -866,6 +864,8 @@ Provide your answer:`
         displayMessage = `**⚠️ Content Moderation**\n\n${errorMessage}\n\n**Suggestions:**\n- Try rephrasing your question more neutrally\n- Switch to a different model using the dropdown\n- Ask more specific questions about the document content`
       } else if (errorMessage.includes('API Error: 500')) {
         displayMessage = `**⚠️ Server Error**\n\nThe AI service is temporarily unavailable (Error 500).\n\n**Try these steps:**\n\n1. Wait 10-15 seconds and retry\n2. Switch to a different model\n3. If issue persists, the service may be experiencing high load\n\n*The system will automatically try alternative models.*`
+      } else if (errorMessage.includes('No content in API response')) {
+        displayMessage = `**⚠️ API Response Error**\n\nThe API returned a response but in an unexpected format.\n\n**This might mean:**\n- The API endpoint needs to be updated for vision support\n- The model doesn't support images\n- Check browser console for the actual response\n\n**Try:**\n1. Using a different model\n2. Asking about text-only pages\n3. Checking if images are too large`
       }
       
       setMessages(prev => [...prev, {
