@@ -98,7 +98,7 @@ function PDFViewer({ pdfUrl, currentPage, setCurrentPage, zoom, setZoom, rotatio
   rotation: number;
   setRotation: (rotation: number) => void;
 }) {
-  const [pages, setPages] = useState([])
+  const [pages, setPages] = useState<Array<{ image: string; pageNumber: number }>>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [totalPages, setTotalPages] = useState(0)
@@ -226,7 +226,7 @@ function PDFViewer({ pdfUrl, currentPage, setCurrentPage, zoom, setZoom, rotatio
             className="bg-white shadow-2xl transition-transform"
           >
             <img 
-              src={currentPageData.image} 
+              src={currentPageData.image || "/placeholder.svg"} 
               alt={`Page ${currentPage}`} 
               className="w-full h-auto"
               draggable={false}
