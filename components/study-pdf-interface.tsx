@@ -14,21 +14,21 @@ const MODELS = [
 
 // Markdown Components
 const MarkdownComponents = {
-  h1: ({node, ...props}) => <h1 className="text-2xl font-bold mt-6 mb-4 text-[#E5E5E0]" {...props} />,
-  h2: ({node, ...props}) => <h2 className="text-xl font-bold mt-5 mb-3 text-[#E5E5E0]" {...props} />,
-  h3: ({node, ...props}) => <h3 className="text-lg font-semibold mt-4 mb-2 text-[#E5E5E0]" {...props} />,
-  p: ({node, ...props}) => <p className="mb-3 leading-relaxed text-[#D4D4CF]" {...props} />,
-  ul: ({node, ...props}) => <ul className="list-disc list-inside mb-3 space-y-1 text-[#D4D4CF]" {...props} />,
-  ol: ({node, ...props}) => <ol className="list-decimal list-inside mb-3 space-y-1 text-[#D4D4CF]" {...props} />,
-  li: ({node, ...props}) => <li className="ml-4" {...props} />,
-  code: ({node, inline, ...props}) => 
+  h1: ({...props}: any) => <h1 className="text-2xl font-bold mt-6 mb-4 text-[#E5E5E0]" {...props} />,
+  h2: ({...props}: any) => <h2 className="text-xl font-bold mt-5 mb-3 text-[#E5E5E0]" {...props} />,
+  h3: ({...props}: any) => <h3 className="text-lg font-semibold mt-4 mb-2 text-[#E5E5E0]" {...props} />,
+  p: ({...props}: any) => <p className="mb-3 leading-relaxed text-[#D4D4CF]" {...props} />,
+  ul: ({...props}: any) => <ul className="list-disc list-inside mb-3 space-y-1 text-[#D4D4CF]" {...props} />,
+  ol: ({...props}: any) => <ol className="list-decimal list-inside mb-3 space-y-1 text-[#D4D4CF]" {...props} />,
+  li: ({...props}: any) => <li className="ml-4" {...props} />,
+  code: ({inline, ...props}: any) => 
     inline 
       ? <code className="bg-[#2A2A2A] px-1.5 py-0.5 rounded text-[#E5E5E0] text-sm font-mono" {...props} />
       : <code className="block bg-[#1A1A1A] p-4 rounded-lg text-[#E5E5E0] text-sm font-mono overflow-x-auto mb-3" {...props} />,
-  blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-[#CC785C] pl-4 italic my-3 text-[#9B9B95]" {...props} />,
-  strong: ({node, ...props}) => <strong className="font-semibold text-[#E5E5E0]" {...props} />,
-  em: ({node, ...props}) => <em className="italic text-[#D4D4CF]" {...props} />,
-  a: ({node, ...props}) => <a className="text-[#CC785C] hover:underline" {...props} />,
+  blockquote: ({...props}: any) => <blockquote className="border-l-4 border-[#CC785C] pl-4 italic my-3 text-[#9B9B95]" {...props} />,
+  strong: ({...props}: any) => <strong className="font-semibold text-[#E5E5E0]" {...props} />,
+  em: ({...props}: any) => <em className="italic text-[#D4D4CF]" {...props} />,
+  a: ({...props}: any) => <a className="text-[#CC785C] hover:underline" {...props} />,
 }
 
 // Model Selector Component
