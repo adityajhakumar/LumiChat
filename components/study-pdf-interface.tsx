@@ -96,7 +96,7 @@ function PDFViewer({ pdfUrl, currentPage, setCurrentPage, zoom, setZoom, rotatio
   zoom: number;
   setZoom: (zoom: number | ((prev: number) => number)) => void;
   rotation: number;
-  setRotation: (rotation: number) => void;
+  setRotation: (rotation: number | ((prev: number) => number)) => void;
 }) {
   const [pages, setPages] = useState<Array<{ image: string; pageNumber: number }>>([])
   const [loading, setLoading] = useState(true)
