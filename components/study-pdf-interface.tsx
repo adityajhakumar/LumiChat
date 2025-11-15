@@ -522,7 +522,7 @@ export default function StudyPDFInterface() {
       
       if (images && images.length > 0) {
         // For vision requests, send images inline
-        const contentArray = [
+        const contentArray: Array<{type: string; text?: string; image_url?: {url: string}}> = [
           { 
             type: "text", 
             text: userPrompt 
