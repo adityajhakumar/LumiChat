@@ -149,7 +149,7 @@ function PDFViewer({ pdfUrl, currentPage, setCurrentPage, zoom, setZoom, rotatio
   }, [pdfUrl])
 
   const handleZoom = (direction: 'in' | 'out') => {
-    setZoom(prev => {
+    setZoom((prev: number) => {
       if (direction === 'in' && prev < 200) return prev + 25
       if (direction === 'out' && prev > 50) return prev - 25
       return prev
