@@ -37,8 +37,8 @@ function ModelSelector({ selectedModel, onModelChange, disabled }: { selectedMod
   const dropdownRef = useRef(null)
 
   useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
         setIsOpen(false)
       }
     }
@@ -147,7 +147,7 @@ function PDFViewer({ pdfUrl, currentPage, setCurrentPage, zoom, setZoom, rotatio
     if (pdfUrl) loadPdf()
   }, [pdfUrl])
 
-  const handleZoom = (direction) => {
+  const handleZoom = (direction: 'in' | 'out') => {
     setZoom(prev => {
       if (direction === 'in' && prev < 200) return prev + 25
       if (direction === 'out' && prev > 50) return prev - 25
@@ -370,7 +370,7 @@ export default function StudyPDFInterface() {
     setIsDragging(true)
   }, [])
 
-  const handleMouseMove = useCallback((e) => {
+  const handleMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging || !splitContainerRef.current) return
     
     const container = splitContainerRef.current
@@ -692,7 +692,7 @@ Provide your answer:`
     }
   }
 
-  const handleKeyDown = (e) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
       handleSendMessage()
