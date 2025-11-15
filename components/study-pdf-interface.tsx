@@ -226,26 +226,19 @@ function CodeBlock({ code, language = "javascript" }: { code: string; language?:
 
 // Main Component
 export default function StudyPDFInterface() {
-  // PDF State
   const [pdfFile, setPdfFile] = useState<PDFFile | null>(null)
   const [pdfChunks, setPdfChunks] = useState<PDFChunk[]>([])
   const [currentPage, setCurrentPage] = useState(1)
   const [zoom, setZoom] = useState(100)
   const [rotation, setRotation] = useState(0)
-  
-  // Chat State
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
   const [processingPDF, setProcessingPDF] = useState(false)
   const [selectedModel, setSelectedModel] = useState(MODELS[0].id)
-  const [lastQuery, setLastQuery] = useState<string | null>(null)
-  
-  // UI State
   const [splitPosition, setSplitPosition] = useState(50)
   const [isDragging, setIsDragging] = useState(false)
-  
-  // Quiz State
+  const [lastQuery, setLastQuery] = useState<string | null>(null)
   const [showQuizModal, setShowQuizModal] = useState(false)
   const [quizMode, setQuizMode] = useState(false)
   const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([])
@@ -253,7 +246,6 @@ export default function StudyPDFInterface() {
   const [savedQuizzes, setSavedQuizzes] = useState<Array<{id: string; name: string; questions: QuizQuestion[]; date: string}>>([])
   const [showSavedQuizzes, setShowSavedQuizzes] = useState(false)
   
-  // Refs
   const fileInputRef = useRef<HTMLInputElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -554,7 +546,6 @@ export default function StudyPDFInterface() {
     }
   }
 
-  // Quiz Management Functions
   const handleGenerateQuiz = async (config: any) => {
     setShowQuizModal(false)
     setGeneratingQuiz(true)
@@ -862,18 +853,7 @@ Provide your answer:`
     }
   }
 
-  // Render loading states and main UI
   if (processingPDF) {
-    return (
-      <div className="flex items-center justify-center h-screen bg-[#1A1A1A]">
-        <div className="text-center">
-          <Loader2 className="w-14 h-14 animate-spin text-[#AB7C5F] mx-auto mb-4" />
-          <p className="text-[#E8E8E3] text-lg font-medium">Processing PDF...</p>
-          <p className="text-[#6B6B65] text-sm mt-2">Extracting text and preparing document</p>
-        </div>
-      </div>
-    )
-  }
     return (
       <div className="flex items-center justify-center h-screen bg-[#1A1A1A]">
         <div className="text-center">
