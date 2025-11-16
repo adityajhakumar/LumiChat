@@ -2,12 +2,6 @@
 const nextConfig = {
   reactStrictMode: true,
   
-  // Force unique build IDs to prevent cache issues
-  generateBuildId: async () => {
-    // Use timestamp to ensure fresh builds
-    return `build-${Date.now()}`
-  },
-  
   // Image optimization
   images: {
     formats: ['image/avif', 'image/webp'],
@@ -24,7 +18,7 @@ const nextConfig = {
     removeConsole: process.env.NODE_ENV === 'production',
   },
   
-  // Headers for security and cache control
+  // Headers for security
   async headers() {
     return [
       {
@@ -49,21 +43,6 @@ const nextConfig = {
           {
             key: 'Referrer-Policy',
             value: 'origin-when-cross-origin'
-          },
-          // Add cache control for static assets
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable'
-          }
-        ],
-      },
-      {
-        // Different cache strategy for HTML pages
-        source: '/',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=0, must-revalidate'
           }
         ],
       },
@@ -71,6 +50,7 @@ const nextConfig = {
   },
   
   // Turbopack configuration (Next.js 16+ default)
+  // Empty object acknowledges we're using Turbopack with default settings
   turbopack: {},
   
   // Webpack configuration (fallback for --webpack mode)
@@ -95,8 +75,6 @@ const nextConfig = {
   // Experimental features for package optimization
   experimental: {
     optimizePackageImports: ['lucide-react', '@vercel/analytics'],
-    // Disable PPR to prevent hydration issues
-    ppr: false,
   },
 }
 

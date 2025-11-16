@@ -35,7 +35,7 @@ import CodeEditor from "./code-editor"
 
 
 // Updated Message interface with image support
-export interface Message {
+interface Message {
   role: string
   content: string
   image?: string
