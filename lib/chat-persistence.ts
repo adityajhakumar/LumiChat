@@ -39,6 +39,11 @@ export async function saveChatToSupabase(
       .single()
 
     if (error) {
+      // If table doesn't exist, return null instead of throwing
+      if (error.code === 'PGRST205' || error.message?.includes('Could not find the table')) {
+        console.warn('[v0] Chat history table not initialized yet - chat will be saved to browser storage only')
+        return null
+      }
       console.error("[v0] Error saving chat to Supabase:", error)
       return null
     }
@@ -111,6 +116,11 @@ export async function getChatHistory(): Promise<ChatSession[]> {
       .order("created_at", { ascending: false })
 
     if (error) {
+      // If table doesn't exist, return empty array instead of throwing
+      if (error.code === 'PGRST205' || error.message?.includes('Could not find the table')) {
+        console.log('[v0] Chat table not found - user may be accessing for the first time')
+        return []
+      }
       console.error("[v0] Error fetching chat history:", error)
       return []
     }
