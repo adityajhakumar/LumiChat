@@ -1,9 +1,10 @@
 import type React from "react"
 import type { Metadata } from "next"
-import { Geist, Geist_Mono } from "next/font/google"
+import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from "@vercel/analytics/next"
 import Script from "next/script"
 import "./globals.css"
+import { AuthProvider } from "@/contexts/auth-context"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
@@ -44,7 +45,9 @@ export default function RootLayout({
         />
       </head>
       <body className="font-sans antialiased">
-        {children}
+        <AuthProvider>
+          {children}
+        </AuthProvider>
         <Analytics />
         
         {/* Highlight.js Script - Load this FIRST */}

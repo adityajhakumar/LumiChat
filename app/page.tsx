@@ -2,12 +2,15 @@
 
 import type React from "react"
 import { useState, useEffect, useRef } from "react"
+import { useAuth } from "@/contexts/auth-context"
+import { useRouter } from 'next/navigation'
 import ChatInterface from "@/components/chat-interface"
 import TokenCounter from "@/components/token-counter"
 import ShareChat from "@/components/share-chat"
-import { Menu, MessageSquare, Trash2, BookOpen, Plus, Sparkles, MoreHorizontal, X } from "lucide-react"
+import DatabaseSetup from "@/components/database-setup"
+import { Menu, MessageSquare, Trash2, BookOpen, Plus, Sparkles, MoreHorizontal, X, LogOut } from 'lucide-react'
 import LumiChatsLanding from "@/components/landing-page"
-
+import { getChatHistory, deleteChatFromSupabase, saveChatToSupabase, updateChatInSupabase } from "@/lib/chat-persistence"
 
 interface ChatSession {
   id: string
@@ -15,6 +18,7 @@ interface ChatSession {
   messages: Array<{ role: string; content: string }>
   model: string
   timestamp: number
+  title?: string
 }
 
 interface StudySession {
@@ -26,11 +30,14 @@ interface StudySession {
 }
 
 export default function Home() {
+  const { user, isLoading: authLoading, signOut } = useAuth()
+  const router = useRouter()
+  
   const [showLanding, setShowLanding] = useState(true)
   const [selectedModel, setSelectedModel] = useState("meta-llama/llama-4-maverick:free")
   const [tokenCount, setTokenCount] = useState(0)
   const [messages, setMessages] = useState<Array<{ role: string; content: string }>>([])
-  const [sidebarOpen, setSidebarOpen] = useState(true) // Default open on desktop
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([])
   const [currentChatId, setCurrentChatId] = useState<string | null>(null)
   const [studyMode, setStudyMode] = useState(false)
@@ -38,61 +45,44 @@ export default function Home() {
   const [showStudyHistory, setShowStudyHistory] = useState(false)
   const [currentStudySession, setCurrentStudySession] = useState<StudySession | null>(null)
   const [sessionsLoaded, setSessionsLoaded] = useState(false)
+  const [isSavingChat, setIsSavingChat] = useState(false)
+  const [dbError, setDbError] = useState(false)
 
   const sidebarRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
-    if (typeof window !== "undefined") {
-      const hasVisited = window.localStorage.getItem("lumichats_has_visited")
-      if (hasVisited === "true") {
-        setShowLanding(false)
-      }
-      
-      // Load sidebar state from localStorage
-      const savedSidebarState = window.localStorage.getItem("lumichats_sidebar_open")
-      if (savedSidebarState !== null) {
-        setSidebarOpen(savedSidebarState === "true")
-      } else {
-        // Default: open on desktop, closed on mobile
-        setSidebarOpen(window.innerWidth >= 768)
-      }
+    if (!authLoading && !user) {
+      router.push("/auth/login")
     }
-  }, [])
-
-  const handleEnterApp = () => {
-    if (typeof window !== "undefined") {
-      window.localStorage.setItem("lumichats_has_visited", "true")
-    }
-    setShowLanding(false)
-  }
-
-  // Save sidebar state to localStorage
-  useEffect(() => {
-    if (typeof window !== "undefined" && !showLanding) {
-      window.localStorage.setItem("lumichats_sidebar_open", sidebarOpen.toString())
-    }
-  }, [sidebarOpen, showLanding])
+  }, [user, authLoading, router])
 
   useEffect(() => {
-    if (typeof window === "undefined" || showLanding) return
+    if (user && !authLoading) {
+      loadChatsFromSupabase()
+      setShowLanding(false)
+    }
+  }, [user, authLoading])
+
+  const loadChatsFromSupabase = async () => {
     try {
-      const saved = window.localStorage.getItem("mmchat_sessions")
-      if (saved) {
-        const parsed = JSON.parse(saved)
-        if (Array.isArray(parsed)) {
-          setChatSessions(parsed)
-        } else {
-          console.warn("Invalid chat session format, clearing storage.")
-          window.localStorage.removeItem("mmchat_sessions")
-        }
-      }
-    } catch (err) {
-      console.error("Failed to load chat sessions:", err)
-      window.localStorage.removeItem("mmchat_sessions")
-    } finally {
+      const chats = await getChatHistory()
+      const formattedChats = chats.map((chat) => ({
+        id: chat.id,
+        name: chat.title || "Untitled Chat",
+        messages: Array.isArray(chat.messages) ? chat.messages : [],
+        model: chat.model || "meta-llama/llama-4-maverick:free",
+        timestamp: new Date(chat.updated_at).getTime(),
+        title: chat.title,
+      }))
+      setChatSessions(formattedChats)
+      setSessionsLoaded(true)
+      setDbError(false)
+    } catch (error) {
+      console.error("Error loading chats from Supabase:", error)
+      setDbError(true)
       setSessionsLoaded(true)
     }
-  }, [showLanding])
+  }
 
   useEffect(() => {
     if (typeof window === "undefined" || showLanding) return
@@ -102,51 +92,59 @@ export default function Home() {
         const parsed = JSON.parse(saved)
         if (Array.isArray(parsed)) {
           setStudySessions(parsed)
-        } else {
-          console.warn("Invalid study session format, clearing storage.")
-          window.localStorage.removeItem("mmchat_study_sessions")
         }
       }
     } catch (err) {
       console.error("Failed to load study sessions:", err)
-      window.localStorage.removeItem("mmchat_study_sessions")
     }
   }, [showLanding])
 
   useEffect(() => {
     if (typeof window !== "undefined" && !showLanding) {
-      window.localStorage.setItem("mmchat_sessions", JSON.stringify(chatSessions))
+      window.localStorage.setItem("lumichats_sidebar_open", sidebarOpen.toString())
     }
-  }, [chatSessions, showLanding])
+  }, [sidebarOpen, showLanding])
 
   useEffect(() => {
-    if (!currentChatId || messages.length === 0) return
+    if (!user || !currentChatId || messages.length === 0 || isSavingChat) return
 
-    setChatSessions((prev) =>
-      prev.map((session) => {
-        if (session.id !== currentChatId) return session
+    const saveTimer = setTimeout(async () => {
+      setIsSavingChat(true)
+      try {
+        const chatSession = chatSessions.find((s) => s.id === currentChatId)
+        if (chatSession) {
+          const chatTitle = chatSession.name === "New chat" 
+            ? (messages.find((m) => m.role === "user")?.content.substring(0, 50) || "Chat")
+            : chatSession.name
 
-        let name = session.name
-        if (name === "New chat") {
-          const firstUserMsg = messages.find((m) => m.role === "user")
-          if (firstUserMsg) {
-            name = firstUserMsg.content.substring(0, 50).trim()
-            if (firstUserMsg.content.length > 50) name += "..."
-          }
+          await updateChatInSupabase(currentChatId, messages, chatTitle)
+          
+          setChatSessions((prev) =>
+            prev.map((session) =>
+              session.id === currentChatId
+                ? { ...session, name: chatTitle, messages, model: selectedModel, timestamp: Date.now() }
+                : session
+            )
+          )
         }
+      } catch (error) {
+        console.error("Error saving chat:", error)
+      } finally {
+        setIsSavingChat(false)
+      }
+    }, 2000) // Debounce saves by 2 seconds
 
-        return {
-          ...session,
-          name,
-          messages,
-          model: selectedModel,
-          timestamp: Date.now(),
-        }
-      })
-    )
-  }, [messages, selectedModel, currentChatId])
+    return () => clearTimeout(saveTimer)
+  }, [messages, currentChatId, user, selectedModel, chatSessions, isSavingChat])
 
-  const handleNewChat = () => {
+  const handleEnterApp = () => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("lumichats_has_visited", "true")
+    }
+    setShowLanding(false)
+  }
+
+  const handleNewChat = async () => {
     const newChatId = Date.now().toString()
     const newSession: ChatSession = {
       id: newChatId,
@@ -155,10 +153,24 @@ export default function Home() {
       model: selectedModel,
       timestamp: Date.now(),
     }
-    setChatSessions((prev) => [newSession, ...prev])
-    setCurrentChatId(newChatId)
+    
+    if (user) {
+      try {
+        const saved = await saveChatToSupabase("New chat", [], selectedModel)
+        if (saved) {
+          newSession.id = saved.id
+          setChatSessions((prev) => [newSession, ...prev])
+          setCurrentChatId(saved.id)
+        }
+      } catch (error) {
+        console.error("Error creating new chat:", error)
+      }
+    } else {
+      setChatSessions((prev) => [newSession, ...prev])
+      setCurrentChatId(newChatId)
+    }
+    
     setMessages([])
-    // Only close sidebar on mobile after creating new chat
     if (typeof window !== "undefined" && window.innerWidth < 768) {
       setSidebarOpen(false)
     }
@@ -170,15 +182,23 @@ export default function Home() {
       setCurrentChatId(chatId)
       setMessages(session.messages)
       setSelectedModel(session.model)
-      // Only close sidebar on mobile after loading chat
       if (typeof window !== "undefined" && window.innerWidth < 768) {
         setSidebarOpen(false)
       }
     }
   }
 
-  const handleDeleteChat = (chatId: string, e: React.MouseEvent) => {
+  const handleDeleteChat = async (chatId: string, e: React.MouseEvent) => {
     e.stopPropagation()
+    
+    if (user) {
+      try {
+        await deleteChatFromSupabase(chatId)
+      } catch (error) {
+        console.error("Error deleting chat:", error)
+      }
+    }
+    
     setChatSessions((prev) => prev.filter((s) => s.id !== chatId))
     if (currentChatId === chatId) {
       setMessages([])
@@ -197,7 +217,6 @@ export default function Home() {
       setCurrentStudySession(session)
       setStudyMode(true)
       setMessages([{ role: "user", content: session.question }])
-      // Only close sidebar on mobile after loading study session
       if (typeof window !== "undefined" && window.innerWidth < 768) {
         setSidebarOpen(false)
       }
@@ -233,15 +252,12 @@ export default function Home() {
 
   const chatGroups = groupChatsByTime(chatSessions)
 
-  // Close sidebar when clicking outside (mobile only)
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // Only apply on mobile
       if (window.innerWidth >= 768) return
       
       if (sidebarRef.current && !sidebarRef.current.contains(event.target as Node)) {
         const target = event.target as HTMLElement
-        // Check if click is on the toggle button
         const toggleButton = document.querySelector('[data-sidebar-toggle="true"]')
         if (toggleButton && (toggleButton === target || toggleButton.contains(target))) {
           return
@@ -257,21 +273,24 @@ export default function Home() {
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [sidebarOpen])
 
-  if (showLanding) {
-    return <LumiChatsLanding onEnterApp={handleEnterApp} />
-  }
-
-  if (!sessionsLoaded) {
+  if (authLoading || !sessionsLoaded) {
     return (
       <main className="flex items-center justify-center h-screen bg-[#212121] text-[#E5E5E0]">
-        <div>Loading your chats...</div>
+        <div>Loading...</div>
       </main>
     )
   }
 
+  if (dbError) {
+    return <DatabaseSetup />
+  }
+
+  if (showLanding && !user) {
+    return <LumiChatsLanding onEnterApp={handleEnterApp} />
+  }
+
   return (
     <main className="flex h-screen bg-background font-sans overflow-hidden antialiased">
-      {/* Mobile Overlay */}
       {sidebarOpen && (
         <div 
           className="fixed inset-0 bg-black/50 z-40 md:hidden"
@@ -279,7 +298,6 @@ export default function Home() {
         />
       )}
 
-      {/* Sidebar - Collapsible on both mobile and desktop */}
       <aside
         ref={sidebarRef}
         className={`fixed md:relative inset-y-0 left-0 z-50 ${
@@ -290,7 +308,6 @@ export default function Home() {
           <h1 className="text-lg font-normal text-[#E5E5E0]" style={{ fontFamily: "serif" }}>
             LumiChat
           </h1>
-          {/* Close button visible on both mobile and desktop */}
           <button
             onClick={() => setSidebarOpen(false)}
             className="p-2 hover:bg-[#2A2A2A] rounded-md transition-colors text-[#9B9B95]"
@@ -350,14 +367,6 @@ export default function Home() {
                     >
                       <div className="text-sm text-[#E5E5E0] truncate">{session.question}</div>
                     </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-[#3A3A3A] rounded transition-all text-[#9B9B95] mr-2 flex-shrink-0"
-                    >
-                      <MoreHorizontal size={16} />
-                    </button>
                   </div>
                 ))
               ) : (
@@ -402,11 +411,25 @@ export default function Home() {
             </div>
           )}
         </div>
+
+        <div className="border-t border-[#2E2E2E] p-3 space-y-2">
+          <div className="px-2 py-1 text-xs text-[#6B6B65] truncate">
+            {user?.email}
+          </div>
+          <button
+            onClick={async () => {
+              await signOut()
+              router.push("/auth/login")
+            }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-[#E5E5E0] hover:bg-[#2A2A2A] rounded-lg transition-colors text-sm"
+          >
+            <LogOut size={16} />
+            Logout
+          </button>
+        </div>
       </aside>
 
-      {/* Main content */}
       <div className="flex-1 flex flex-col min-w-0 bg-[#212121] transition-all duration-300 ease-in-out">
-        {/* Header - Mobile optimized */}
         <header className="border-b border-[#343434] bg-[#1A1A1A] px-3 md:px-4 py-3 flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
             <button
@@ -420,6 +443,9 @@ export default function Home() {
             <div className="text-sm text-[#E5E5E0] truncate">
               {currentChatId ? chatSessions.find((s) => s.id === currentChatId)?.name : "LumiChat"}
             </div>
+            {isSavingChat && (
+              <div className="text-xs text-[#6B6B65] hidden sm:inline">Saving...</div>
+            )}
           </div>
           
           <div className="flex items-center gap-2 flex-shrink-0">
@@ -456,7 +482,6 @@ export default function Home() {
           </div>
         </header>
 
-        {/* Chat area */}
         <div className="flex-1 overflow-hidden">
           <ChatInterface
             selectedModel={selectedModel}
