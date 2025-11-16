@@ -40,7 +40,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
 
       <body className="font-sans antialiased">
-        <Providers>{children}</Providers>
+        <Providers>
+          {children}
+        </Providers>
         <Analytics />
 
         {/* highlight.js — MUST run AFTER hydration */}

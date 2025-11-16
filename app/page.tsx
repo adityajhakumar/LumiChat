@@ -30,10 +30,13 @@ interface StudySession {
 }
 
 export default function Home() {
-  // Add mounted state to prevent SSR issues
-  const [mounted, setMounted] = useState(false)
   const router = useRouter()
   
+  // Call useAuth unconditionally at the top
+  const { user, isLoading: authLoading, signOut } = useAuth()
+  
+  // All state declarations
+  const [mounted, setMounted] = useState(false)
   const [showLanding, setShowLanding] = useState(true)
   const [selectedModel, setSelectedModel] = useState("meta-llama/llama-4-maverick:free")
   const [tokenCount, setTokenCount] = useState(0)
@@ -50,9 +53,6 @@ export default function Home() {
   const [dbError, setDbError] = useState(false)
 
   const sidebarRef = useRef<HTMLDivElement | null>(null)
-
-  // MUST call useAuth unconditionally - hooks can't be conditional
-  const { user, isLoading: authLoading, signOut } = useAuth()
 
   // Set mounted state after component mounts
   useEffect(() => {

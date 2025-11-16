@@ -1,8 +1,8 @@
 "use client"
 
 import { createContext, useContext, useEffect, useState } from "react"
-import { createClient } from "@/lib/supabase/client"
 import type { User, Session } from "@supabase/supabase-js"
+import type { SupabaseClient } from "@supabase/supabase-js"
 
 interface AuthContextType {
   user: User | null
@@ -10,23 +10,50 @@ interface AuthContextType {
   signOut: () => Promise<void>
 }
 
-// Use undefined as default to properly detect missing provider
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    // Create supabase client inside useEffect
-    const supabase = createClient()
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!mounted) return
+
+    let supabase: SupabaseClient | null = null
+    let subscription: any = null
 
     const initializeAuth = async () => {
       try {
-        const { data: { user: initialUser } } = await supabase.auth.getUser()
-        setUser(initialUser ?? null)
+        // Import and create client only after component mounts
+        const { createClient } = await import("@/lib/supabase/client")
+        supabase = createClient()
+
+        // Get initial user
+        const { data: { user: initialUser }, error } = await supabase.auth.getUser()
+        
+        if (error) {
+          console.error("[AuthProvider] Error getting user:", error)
+          setUser(null)
+        } else {
+          setUser(initialUser ?? null)
+        }
+
+        // Set up auth state listener
+        const { data: { subscription: authSubscription } } = supabase.auth.onAuthStateChange(
+          (_event: any, session: Session | null) => {
+            setUser(session?.user ?? null)
+            setIsLoading(false)
+          }
+        )
+
+        subscription = authSubscription
       } catch (error) {
-        console.error("[AuthProvider] Error getting initial user:", error)
+        console.error("[AuthProvider] Error initializing auth:", error)
         setUser(null)
       } finally {
         setIsLoading(false)
@@ -35,20 +62,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     initializeAuth()
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event: any, session: Session | null) => {
-        setUser(session?.user ?? null)
-        setIsLoading(false)
-      }
-    )
-
     return () => {
       subscription?.unsubscribe()
     }
-  }, []) // Empty dependency array - run once on mount
+  }, [mounted])
 
   const signOut = async () => {
     try {
+      const { createClient } = await import("@/lib/supabase/client")
       const supabase = createClient()
       await supabase.auth.signOut()
       setUser(null)
@@ -67,12 +88,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext)
   if (context === undefined) {
-    // This error means AuthProvider is not wrapping the component
-    console.error("useAuth was called outside of AuthProvider. Component tree:", {
-      error: "Missing AuthProvider wrapper",
-      solution: "Ensure <AuthProvider> wraps your app in layout.tsx"
-    })
-    throw new Error("useAuth must be used within AuthProvider. Make sure your component is wrapped with <AuthProvider>.")
+    throw new Error("useAuth must be used within AuthProvider")
   }
   return context
 }
