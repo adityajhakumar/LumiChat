@@ -30,7 +30,8 @@ interface StudySession {
 }
 
 export default function Home() {
-  const { user, isLoading: authLoading, signOut } = useAuth()
+  // Add mounted state to prevent SSR issues
+  const [mounted, setMounted] = useState(false)
   const router = useRouter()
   
   const [showLanding, setShowLanding] = useState(true)
@@ -50,28 +51,35 @@ export default function Home() {
 
   const sidebarRef = useRef<HTMLDivElement | null>(null)
 
+  // MUST call useAuth unconditionally - hooks can't be conditional
+  const { user, isLoading: authLoading, signOut } = useAuth()
+
+  // Set mounted state after component mounts
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   // Check if user has visited before OR if user is logged in
   useEffect(() => {
+    if (!mounted) return
+    
     const hasVisited = typeof window !== 'undefined' ? localStorage.getItem("lumichats_has_visited") : null
     
     if (user) {
-      // User is logged in, skip landing page
       setShowLanding(false)
       setSessionsLoaded(false)
     } else if (hasVisited === "true") {
-      // User has visited before but not logged in, skip landing page
       setShowLanding(false)
     } else {
-      // First time visitor and not logged in, show landing page
       setShowLanding(true)
     }
-  }, [user])
+  }, [user, mounted])
 
   useEffect(() => {
-    if (user && !authLoading) {
+    if (user && !authLoading && mounted) {
       loadChatsFromSupabase()
     }
-  }, [user, authLoading])
+  }, [user, authLoading, mounted])
 
   const loadChatsFromSupabase = async () => {
     try {
@@ -95,7 +103,7 @@ export default function Home() {
   }
 
   useEffect(() => {
-    if (typeof window === "undefined" || showLanding) return
+    if (typeof window === "undefined" || showLanding || !mounted) return
     try {
       const saved = window.localStorage.getItem("mmchat_study_sessions")
       if (saved) {
@@ -107,16 +115,16 @@ export default function Home() {
     } catch (err) {
       console.error("Failed to load study sessions:", err)
     }
-  }, [showLanding])
+  }, [showLanding, mounted])
 
   useEffect(() => {
-    if (typeof window !== "undefined" && !showLanding) {
+    if (typeof window !== "undefined" && !showLanding && mounted) {
       window.localStorage.setItem("lumichats_sidebar_open", sidebarOpen.toString())
     }
-  }, [sidebarOpen, showLanding])
+  }, [sidebarOpen, showLanding, mounted])
 
   useEffect(() => {
-    if (!user || !currentChatId || messages.length === 0 || isSavingChat) return
+    if (!user || !currentChatId || messages.length === 0 || isSavingChat || !mounted) return
 
     const saveTimer = setTimeout(async () => {
       setIsSavingChat(true)
@@ -145,19 +153,16 @@ export default function Home() {
     }, 2000)
 
     return () => clearTimeout(saveTimer)
-  }, [messages, currentChatId, user, selectedModel, chatSessions, isSavingChat])
+  }, [messages, currentChatId, user, selectedModel, chatSessions, isSavingChat, mounted])
 
   const handleEnterApp = () => {
-    // Mark that user has seen the landing page
     if (typeof window !== "undefined") {
       window.localStorage.setItem("lumichats_has_visited", "true")
     }
     
-    // If not logged in, redirect to login page
     if (!user) {
       router.push("/auth/login")
     } else {
-      // If logged in, just hide landing page
       setShowLanding(false)
     }
   }
@@ -291,7 +296,8 @@ export default function Home() {
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [sidebarOpen])
 
-  if (authLoading) {
+  // Show loading while mounting or auth is loading
+  if (!mounted || authLoading) {
     return (
       <main className="flex items-center justify-center h-screen bg-[#212121] text-[#E5E5E0]">
         <div className="flex flex-col items-center gap-4">
@@ -306,12 +312,10 @@ export default function Home() {
     return <DatabaseSetup />
   }
 
-  // Show landing page for first-time visitors or when explicitly shown
   if (showLanding) {
     return <LumiChatsLanding onEnterApp={handleEnterApp} />
   }
 
-  // If not logged in and not showing landing, redirect to login
   if (!user && !showLanding) {
     router.push("/auth/login")
     return (
