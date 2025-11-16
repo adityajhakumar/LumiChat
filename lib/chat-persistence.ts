@@ -1,7 +1,7 @@
 "use client"
 
 import { createClient } from "@/lib/supabase/client"
-import type { Message } from "@/components/chat-interface"
+import type { Message } from "@/lib/types"
 
 interface ChatSession {
   id: string
@@ -23,34 +23,45 @@ export async function saveChatToSupabase(
     // Get current user
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      console.error("[v0] No user logged in for saving chat")
+      console.error("[LumiChat] No user logged in for saving chat")
       return null
     }
+
+    console.log("[LumiChat] 💾 Saving new chat:", { 
+      title, 
+      messageCount: messages.length, 
+      model,
+      userId: user.id 
+    })
+
+    // Clean messages - remove any undefined or null values
+    const cleanMessages = messages.map(msg => ({
+      role: msg.role,
+      content: msg.content,
+      ...(msg.image && { image: msg.image }),
+      ...(msg.images && msg.images.length > 0 && { images: msg.images })
+    }))
 
     const { data, error } = await supabase
       .from("chat_histories")
       .insert({
         user_id: user.id,
         title: title || "Untitled Chat",
-        messages: messages,
+        messages: cleanMessages, // Supabase handles JSONB automatically
         model: model,
       })
       .select()
       .single()
 
     if (error) {
-      // If table doesn't exist, return null instead of throwing
-      if (error.code === 'PGRST205' || error.message?.includes('Could not find the table')) {
-        console.warn('[v0] Chat history table not initialized yet - chat will be saved to browser storage only')
-        return null
-      }
-      console.error("[v0] Error saving chat to Supabase:", error)
+      console.error("[LumiChat] ❌ Error saving chat:", error)
       return null
     }
 
+    console.log("[LumiChat] ✅ Chat saved successfully:", data.id)
     return data as ChatSession
   } catch (error) {
-    console.error("[v0] Error in saveChatToSupabase:", error)
+    console.error("[LumiChat] ❌ Exception in saveChatToSupabase:", error)
     return null
   }
 }
@@ -65,12 +76,26 @@ export async function updateChatInSupabase(
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      console.error("[v0] No user logged in for updating chat")
+      console.error("[LumiChat] No user logged in for updating chat")
       return null
     }
 
+    console.log("[LumiChat] 🔄 Updating chat:", { 
+      chatId, 
+      messageCount: messages.length,
+      title 
+    })
+
+    // Clean messages
+    const cleanMessages = messages.map(msg => ({
+      role: msg.role,
+      content: msg.content,
+      ...(msg.image && { image: msg.image }),
+      ...(msg.images && msg.images.length > 0 && { images: msg.images })
+    }))
+
     const updateData: any = {
-      messages: messages,
+      messages: cleanMessages,
       updated_at: new Date().toISOString(),
     }
 
@@ -87,13 +112,14 @@ export async function updateChatInSupabase(
       .single()
 
     if (error) {
-      console.error("[v0] Error updating chat in Supabase:", error)
+      console.error("[LumiChat] ❌ Error updating chat:", error)
       return null
     }
 
+    console.log("[LumiChat] ✅ Chat updated successfully")
     return data as ChatSession
   } catch (error) {
-    console.error("[v0] Error in updateChatInSupabase:", error)
+    console.error("[LumiChat] ❌ Exception in updateChatInSupabase:", error)
     return null
   }
 }
@@ -105,29 +131,38 @@ export async function getChatHistory(): Promise<ChatSession[]> {
     // Get current user
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      console.error("[v0] No user logged in for fetching chat history")
+      console.error("[LumiChat] No user logged in for fetching chat history")
       return []
     }
+
+    console.log("[LumiChat] 📂 Fetching chat history for user:", user.id)
 
     const { data, error } = await supabase
       .from("chat_histories")
       .select("*")
       .eq("user_id", user.id)
-      .order("created_at", { ascending: false })
+      .order("updated_at", { ascending: false })
 
     if (error) {
-      // If table doesn't exist, return empty array instead of throwing
-      if (error.code === 'PGRST205' || error.message?.includes('Could not find the table')) {
-        console.log('[v0] Chat table not found - user may be accessing for the first time')
-        return []
-      }
-      console.error("[v0] Error fetching chat history:", error)
+      console.error("[LumiChat] ❌ Error fetching chat history:", error)
       return []
     }
 
+    console.log("[LumiChat] ✅ Loaded chats:", data?.length || 0)
+    
+    if (data && data.length > 0) {
+      console.log("[LumiChat] 📊 Sample chat:", {
+        id: data[0].id,
+        title: data[0].title,
+        messageCount: Array.isArray(data[0].messages) ? data[0].messages.length : 'N/A',
+        created: data[0].created_at
+      })
+    }
+
+    // Supabase automatically parses JSONB, no need to JSON.parse
     return (data || []) as ChatSession[]
   } catch (error) {
-    console.error("[v0] Error in getChatHistory:", error)
+    console.error("[LumiChat] ❌ Exception in getChatHistory:", error)
     return []
   }
 }
@@ -138,9 +173,11 @@ export async function getChatById(chatId: string): Promise<ChatSession | null> {
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      console.error("[v0] No user logged in for fetching chat")
+      console.error("[LumiChat] No user logged in for fetching chat")
       return null
     }
+
+    console.log("[LumiChat] 🔍 Fetching chat by ID:", chatId)
 
     const { data, error } = await supabase
       .from("chat_histories")
@@ -150,13 +187,14 @@ export async function getChatById(chatId: string): Promise<ChatSession | null> {
       .single()
 
     if (error) {
-      console.error("[v0] Error fetching chat:", error)
+      console.error("[LumiChat] ❌ Error fetching chat:", error)
       return null
     }
 
+    console.log("[LumiChat] ✅ Chat loaded:", data.id)
     return data as ChatSession
   } catch (error) {
-    console.error("[v0] Error in getChatById:", error)
+    console.error("[LumiChat] ❌ Exception in getChatById:", error)
     return null
   }
 }
@@ -167,9 +205,11 @@ export async function deleteChatFromSupabase(chatId: string): Promise<boolean> {
 
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) {
-      console.error("[v0] No user logged in for deleting chat")
+      console.error("[LumiChat] No user logged in for deleting chat")
       return false
     }
+
+    console.log("[LumiChat] 🗑️ Deleting chat:", chatId)
 
     const { error } = await supabase
       .from("chat_histories")
@@ -178,13 +218,14 @@ export async function deleteChatFromSupabase(chatId: string): Promise<boolean> {
       .eq("user_id", user.id)
 
     if (error) {
-      console.error("[v0] Error deleting chat:", error)
+      console.error("[LumiChat] ❌ Error deleting chat:", error)
       return false
     }
 
+    console.log("[LumiChat] ✅ Chat deleted successfully")
     return true
   } catch (error) {
-    console.error("[v0] Error in deleteChatFromSupabase:", error)
+    console.error("[LumiChat] ❌ Exception in deleteChatFromSupabase:", error)
     return false
   }
 }

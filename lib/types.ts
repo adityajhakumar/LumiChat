@@ -1,8 +1,9 @@
 export interface Message {
-  id: string
-  role: 'user' | 'assistant'
+  role: string
   content: string
-  timestamp: Date
+  image?: string
+  images?: string[]
+  timestamp?: Date
 }
 
 export interface ChatSession {
@@ -12,4 +13,5 @@ export interface ChatSession {
   model: string
   created_at: string
   updated_at: string
+  user_id?: string
 }
