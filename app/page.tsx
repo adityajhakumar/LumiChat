@@ -8,7 +8,7 @@ import ChatInterface from "@/components/chat-interface"
 import TokenCounter from "@/components/token-counter"
 import ShareChat from "@/components/share-chat"
 import DatabaseSetup from "@/components/database-setup"
-import { Menu, MessageSquare, Trash2, BookOpen, Plus, Sparkles, MoreHorizontal, X, LogOut } from 'lucide-react'
+import { Menu, MessageSquare, Trash2, BookOpen, Plus, Sparkles, X, LogOut } from 'lucide-react'
 import LumiChatsLanding from "@/components/landing-page"
 import { getChatHistory, deleteChatFromSupabase, saveChatToSupabase, updateChatInSupabase } from "@/lib/chat-persistence"
 
@@ -50,16 +50,26 @@ export default function Home() {
 
   const sidebarRef = useRef<HTMLDivElement | null>(null)
 
+  // Check if user has visited before OR if user is logged in
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push("/auth/login")
+    const hasVisited = typeof window !== 'undefined' ? localStorage.getItem("lumichats_has_visited") : null
+    
+    if (user) {
+      // User is logged in, skip landing page
+      setShowLanding(false)
+      setSessionsLoaded(false)
+    } else if (hasVisited === "true") {
+      // User has visited before but not logged in, skip landing page
+      setShowLanding(false)
+    } else {
+      // First time visitor and not logged in, show landing page
+      setShowLanding(true)
     }
-  }, [user, authLoading, router])
+  }, [user])
 
   useEffect(() => {
     if (user && !authLoading) {
       loadChatsFromSupabase()
-      setShowLanding(false)
     }
   }, [user, authLoading])
 
@@ -132,16 +142,24 @@ export default function Home() {
       } finally {
         setIsSavingChat(false)
       }
-    }, 2000) // Debounce saves by 2 seconds
+    }, 2000)
 
     return () => clearTimeout(saveTimer)
   }, [messages, currentChatId, user, selectedModel, chatSessions, isSavingChat])
 
   const handleEnterApp = () => {
+    // Mark that user has seen the landing page
     if (typeof window !== "undefined") {
       window.localStorage.setItem("lumichats_has_visited", "true")
     }
-    setShowLanding(false)
+    
+    // If not logged in, redirect to login page
+    if (!user) {
+      router.push("/auth/login")
+    } else {
+      // If logged in, just hide landing page
+      setShowLanding(false)
+    }
   }
 
   const handleNewChat = async () => {
@@ -273,22 +291,40 @@ export default function Home() {
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [sidebarOpen])
 
-  if (authLoading || !sessionsLoaded) {
+  if (authLoading) {
     return (
       <main className="flex items-center justify-center h-screen bg-[#212121] text-[#E5E5E0]">
-        <div>Loading...</div>
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#CC785C]"></div>
+          <div>Loading...</div>
+        </div>
       </main>
     )
   }
 
-  if (dbError) {
+  if (dbError && user) {
     return <DatabaseSetup />
   }
 
-  if (showLanding && !user) {
+  // Show landing page for first-time visitors or when explicitly shown
+  if (showLanding) {
     return <LumiChatsLanding onEnterApp={handleEnterApp} />
   }
 
+  // If not logged in and not showing landing, redirect to login
+  if (!user && !showLanding) {
+    router.push("/auth/login")
+    return (
+      <main className="flex items-center justify-center h-screen bg-[#212121] text-[#E5E5E0]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#CC785C]"></div>
+          <div>Redirecting to login...</div>
+        </div>
+      </main>
+    )
+  }
+
+  // Main app interface (only shown when user is logged in)
   return (
     <main className="flex h-screen bg-background font-sans overflow-hidden antialiased">
       {sidebarOpen && (
