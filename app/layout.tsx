@@ -4,7 +4,7 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import { Analytics } from "@vercel/analytics/next"
 import Script from "next/script"
 import "./globals.css"
-import { AuthProvider } from "@/contexts/auth-context"
+import { Providers } from "./providers"
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
@@ -40,7 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
 
       <body className="font-sans antialiased">
-        <AuthProvider>{children}</AuthProvider>
+        <Providers>{children}</Providers>
         <Analytics />
 
         {/* highlight.js — MUST run AFTER hydration */}

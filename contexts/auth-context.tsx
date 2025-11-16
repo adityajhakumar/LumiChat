@@ -10,27 +10,14 @@ interface AuthContextType {
   signOut: () => Promise<void>
 }
 
-// Provide a default value to prevent undefined context errors
-const AuthContext = createContext<AuthContextType>({
-  user: null,
-  isLoading: true,
-  signOut: async () => {},
-})
+// Use undefined as default to properly detect missing provider
+const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [mounted, setMounted] = useState(false)
-
-  // Track when component is mounted
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   useEffect(() => {
-    // Only run auth logic after mount
-    if (!mounted) return
-
     // Create supabase client inside useEffect
     const supabase = createClient()
 
@@ -58,7 +45,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription?.unsubscribe()
     }
-  }, [mounted])
+  }, []) // Empty dependency array - run once on mount
 
   const signOut = async () => {
     try {
@@ -80,6 +67,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 export function useAuth() {
   const context = useContext(AuthContext)
   if (context === undefined) {
+    // This error means AuthProvider is not wrapping the component
+    console.error("useAuth was called outside of AuthProvider. Component tree:", {
+      error: "Missing AuthProvider wrapper",
+      solution: "Ensure <AuthProvider> wraps your app in layout.tsx"
+    })
     throw new Error("useAuth must be used within AuthProvider. Make sure your component is wrapped with <AuthProvider>.")
   }
   return context
