@@ -651,7 +651,7 @@ export default function LumiChatsLanding({ onEnterApp }: LumiChatsLandingProps) 
         </div>
       </footer>
 
-      <style jsx>{`
+      <style dangerouslySetInnerHTML={{__html: `
         @keyframes fadeInUp {
           from {
             opacity: 0;
@@ -740,7 +740,7 @@ export default function LumiChatsLanding({ onEnterApp }: LumiChatsLandingProps) 
         .perspective-1000 {
           perspective: 1000px;
         }
-      `}</style>
+      `}} />
     </div>
   );
 }
