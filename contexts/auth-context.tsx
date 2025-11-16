@@ -24,14 +24,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!mounted) return
 
-    let supabase: SupabaseClient | null = null
     let subscription: any = null
 
     const initializeAuth = async () => {
       try {
         // Import and create client only after component mounts
         const { createClient } = await import("@/lib/supabase/client")
-        supabase = createClient()
+        const supabase: SupabaseClient = createClient()
 
         // Get initial user
         const { data: { user: initialUser }, error } = await supabase.auth.getUser()
