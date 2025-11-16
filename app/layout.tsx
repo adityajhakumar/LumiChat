@@ -20,23 +20,18 @@ export const metadata: Metadata = {
   },
 }
 
-export default function RootLayout({
-  children,
-}: Readonly<{
-  children: React.ReactNode
-}>) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
-        {/* KaTeX for rendering math */}
+        {/* KaTeX styles */}
         <link
           rel="stylesheet"
           href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css"
           crossOrigin="anonymous"
         />
 
-        {/* Highlight.js CSS - VS Code Dark Theme 
-            FIXED: Removed WRONG integrity hash that broke Chrome */}
+        {/* highlight.js styles */}
         <link
           rel="stylesheet"
           href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/vs2015.min.css"
@@ -45,31 +40,47 @@ export default function RootLayout({
       </head>
 
       <body className="font-sans antialiased">
-        <AuthProvider>
-          {children}
-        </AuthProvider>
-
+        <AuthProvider>{children}</AuthProvider>
         <Analytics />
 
-        {/* Highlight.js Script */}
+        {/* highlight.js — MUST run AFTER hydration */}
         <Script
           src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"
           crossOrigin="anonymous"
-          strategy="beforeInteractive"
+          strategy="afterInteractive"
         />
+        <Script id="hl-init" strategy="afterInteractive">
+          {`window.addEventListener("DOMContentLoaded", () => {
+            document.querySelectorAll("pre code").forEach((block) => {
+              if (window.hljs) window.hljs.highlightBlock(block);
+            });
+          });`}
+        </Script>
 
-        {/* KaTeX Scripts */}
+        {/* KaTeX — MUST run AFTER hydration */}
         <Script
           src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"
           crossOrigin="anonymous"
           strategy="afterInteractive"
         />
-
         <Script
           src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
           crossOrigin="anonymous"
           strategy="afterInteractive"
         />
+        <Script id="katex-init" strategy="afterInteractive">
+          {`window.addEventListener("DOMContentLoaded", () => {
+            if (window.renderMathInElement) {
+              window.renderMathInElement(document.body, {
+                delimiters: [
+                  { left: "$$", right: "$$", display: true },
+                  { left: "$", right: "$", display: false }
+                ]
+              });
+            }
+          });`}
+        </Script>
+
       </body>
     </html>
   )
