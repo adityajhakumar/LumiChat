@@ -27,7 +27,7 @@ interface StudySession {
 
 export default function Home() {
   const [showLanding, setShowLanding] = useState(true)
-  const [selectedModel, setSelectedModel] = useState("meta-llama/llama-4-maverick:free")
+  const [selectedModel, setSelectedModel] = useState("nvidia/nemotron-nano-12b-v2-vl:free")
   const [tokenCount, setTokenCount] = useState(0)
   const [messages, setMessages] = useState<Array<{ role: string; content: string }>>([])
   const [sidebarOpen, setSidebarOpen] = useState(true) // Default open on desktop
