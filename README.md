@@ -1,5 +1,4 @@
 <div align="center">
-
 <!-- Animated Header Wave -->
 <img width="100%" src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=6,11,30&height=200&section=header&text=LUMICHAT&fontSize=80&fontColor=fff&animation=twinkling&fontAlignY=35&desc=Premium%20AI%20at%20Coffee%20Prices%20☕&descAlignY=55&descAlign=50&descSize=22"/>
 
